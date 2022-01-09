@@ -16,7 +16,7 @@ from .views import (
     ask_multi_analysis_availability,
     plugin_disabler,
     plugin_state_viewer,
-    add_yara,
+    add_yara, clean_up_yara, delete_yara,
 )
 
 # Routers provide an easy way of automatically determining the URL conf.
@@ -58,4 +58,6 @@ urlpatterns = [
     path("plugin-disable/", plugin_state_viewer, name="plugin_state_viewer"),
     path("plugin-disable/<int:plugin_type>/<str:plugin_name>/", plugin_disabler),
     path("yara/upload", add_yara),
+    path("yara/<uuid:_id>", delete_yara),
+    path("yara/clean_up", clean_up_yara),
 ]

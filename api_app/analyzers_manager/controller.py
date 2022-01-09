@@ -2,7 +2,7 @@
 # See the file 'LICENSE' for copying permission.
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from celery import chord
 from django.utils.module_loading import import_string
@@ -138,3 +138,16 @@ def run_healthcheck(analyzer_name: str) -> bool:
         raise ValidationError({"detail": "No healthcheck implemented"})
 
     return klass.health_check()
+
+
+def get_custom_yara_folder() -> Optional[str]:
+    analyzer_config = AnalyzerConfig.all()
+    folder = ""
+    for analyzer_name, ac in analyzer_config.items():
+        if analyzer_name == "yara_scan_custom_rules":
+            p = ac.param_values.get("directories_with_rules", [])
+            if len(p) == 0:
+                return None
+            folder = ac.param_values.get("directories_with_rules")[0]
+
+    return folder if folder != "" else None

@@ -29,7 +29,7 @@ from api_app.helpers import get_now
 from intel_owl.celery import app as celery_app
 
 from .analyzers_manager import controller as analyzers_controller
-from .analyzers_manager.dataclasses import AnalyzerConfig
+from .analyzers_manager.controller import get_custom_yara_folder
 from .connectors_manager import controller as connectors_controller
 
 logger = logging.getLogger(__name__)
@@ -330,6 +330,8 @@ class TagViewSet(viewsets.ModelViewSet):
     permission_classes = (DjangoObjectPermissions,)
 
 
+""" CUSTOM YARA RULE API """
+
 @add_docs(
     description="This endpoint allows to add a Yara rules in the custom dataset",
     responses={201: None},
@@ -343,20 +345,9 @@ def add_yara(request):
     except KeyError:
         return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'id or body not set in request'})
 
-    analyzer_config = AnalyzerConfig.all()
-    folder = ""
-    for analyzer_name, ac in analyzer_config.items():
-        if analyzer_name == "yara_scan_custom_rules":
-            p = ac.param_values.get("directories_with_rules", [])
-            if len(p) == 0:
-                return Response(
-                    status=status.HTTP_400_BAD_REQUEST,
-                    data={'error': 'yara_scan_custom_rules not properly configured'}
-                )
-            folder = ac.param_values.get("directories_with_rules")[0]
-
-    if folder == "":
-        return Response(
+    folder = get_custom_yara_folder()
+    if folder is None:
+        Response(
             status=status.HTTP_400_BAD_REQUEST,
             data={'error': 'yara_scan_custom_rules not properly configured'}
         )
@@ -366,3 +357,51 @@ def add_yara(request):
         f.write(body)
 
     return Response(status=status.HTTP_201_CREATED, data={'path': full_path})
+
+
+@add_docs(
+    description="This endpoint allows to delete all yara present in the custom dataset",
+    responses={201: None},
+)
+@api_view(["POST"])
+@permission_required_or_403("api_app.add_job")
+def clean_up_yara(request):
+    folder = get_custom_yara_folder()
+    if folder is None:
+        Response(
+            status=status.HTTP_400_BAD_REQUEST,
+            data={'error': 'yara_scan_custom_rules not properly configured'}
+        )
+
+    for f in os.listdir(folder):
+        full_path = os.path.join(folder, f)
+        print(full_path)
+        os.remove(full_path)
+
+    return Response(status=status.HTTP_200_OK)
+
+
+@add_docs(
+    description="This endpoint allows to delete a single yara present in the custom dataset",
+    responses={200: None},
+)
+@api_view(["DELETE"])
+@permission_required_or_403("api_app.add_job")
+def delete_yara(request, _id):
+    folder = get_custom_yara_folder()
+    if folder is None:
+        Response(
+            status=status.HTTP_400_BAD_REQUEST,
+            data={'error': 'yara_scan_custom_rules not properly configured'}
+        )
+
+    full_path = os.path.join(folder, f"{_id}.yar")
+    try:
+        os.remove(full_path)
+    except FileNotFoundError:
+        Response(
+            status=status.HTTP_404_NOT_FOUND,
+            data={'error': 'Yara not found'}
+        )
+
+    return Response(status=status.HTTP_200_OK)

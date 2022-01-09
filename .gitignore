@@ -21,3 +21,5 @@ docker/.env.start
 .bash_history
 .cache
 .google-cookie
+
+custom_ruleset
