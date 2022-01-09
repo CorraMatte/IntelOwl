@@ -16,6 +16,7 @@ from .views import (
     ask_multi_analysis_availability,
     plugin_disabler,
     plugin_state_viewer,
+    add_yara,
 )
 
 # Routers provide an easy way of automatically determining the URL conf.
@@ -56,4 +57,5 @@ urlpatterns = [
     path("me/", include("certego_saas.apps.organization.urls")),
     path("plugin-disable/", plugin_state_viewer, name="plugin_state_viewer"),
     path("plugin-disable/<int:plugin_type>/<str:plugin_name>/", plugin_disabler),
+    path("yara/upload", add_yara),
 ]

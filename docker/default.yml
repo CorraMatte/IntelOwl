@@ -19,6 +19,7 @@ services:
     volumes:
       - ../configuration/intel_owl.ini:/etc/uwsgi/sites/intel_owl.ini # uwsgi configuration file
       - ../configuration:/opt/deploy/intel_owl/configuration
+      - ../custom_ruleset:/opt/deploy/yara/custom_ruleset
       - generic_logs:/var/log/intel_owl
       - static_content:/opt/deploy/intel_owl/static
       - shared_files:/opt/deploy/files_required
@@ -86,6 +87,7 @@ services:
       - shared_files:/opt/deploy/files_required
     entrypoint:
       - ./docker/entrypoints/celery_default.sh
+      - ../custom_ruleset:/opt/deploy/yara/custom_ruleset
     logging:
       driver: "json-file"
       options:
