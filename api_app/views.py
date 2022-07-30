@@ -2,6 +2,7 @@
 # See the file 'LICENSE' for copying permission.
 
 import logging
+import os
 from copy import deepcopy
 from datetime import timedelta
 from typing import Type, Union
@@ -37,6 +38,7 @@ from intel_owl.celery import app as celery_app
 
 from .analyzers_manager import controller as analyzers_controller
 from .analyzers_manager.constants import ObservableTypes
+from .analyzers_manager.controller import get_custom_yara_folder
 from .filters import JobFilter
 from .helpers import get_now
 from .models import TLP, Job, OrganizationPluginState, PluginConfig, Status, Tag
@@ -810,3 +812,77 @@ def plugin_state_viewer(request):
             "plugin_type": organization_plugin_state.type,
         }
     return Response(result)
+
+
+""" CUSTOM YARA RULE API """
+
+@add_docs(
+    description="This endpoint allows to add a Yara rules in the custom dataset",
+    responses={201: None},
+)
+@api_view(["POST"])
+def add_yara(request):
+    try:
+        _id = request.data['id']
+        body = request.data['body']
+    except KeyError:
+        return Response(status=status.HTTP_400_BAD_REQUEST, data={'error': 'id or body not set in request'})
+
+    folder = get_custom_yara_folder()
+    if folder is None:
+        Response(
+            status=status.HTTP_400_BAD_REQUEST,
+            data={'error': 'yara_scan_custom_rules not properly configured'}
+        )
+
+    full_path = os.path.join(folder, _id) + '.yar'
+    with open(full_path, 'w') as f:
+        f.write(body)
+
+    return Response(status=status.HTTP_201_CREATED, data={'path': full_path})
+
+
+@add_docs(
+    description="This endpoint allows to delete all yara present in the custom dataset",
+    responses={201: None},
+)
+@api_view(["POST"])
+def clean_up_yara(request):
+    folder = get_custom_yara_folder()
+    if folder is None:
+        Response(
+            status=status.HTTP_400_BAD_REQUEST,
+            data={'error': 'yara_scan_custom_rules not properly configured'}
+        )
+
+    for f in os.listdir(folder):
+        full_path = os.path.join(folder, f)
+        print(full_path)
+        os.remove(full_path)
+
+    return Response(status=status.HTTP_200_OK)
+
+
+@add_docs(
+    description="This endpoint allows to delete a single yara present in the custom dataset",
+    responses={200: None},
+)
+@api_view(["DELETE"])
+def delete_yara(request, _id):
+    folder = get_custom_yara_folder()
+    if folder is None:
+        Response(
+            status=status.HTTP_400_BAD_REQUEST,
+            data={'error': 'yara_scan_custom_rules not properly configured'}
+        )
+
+    full_path = os.path.join(folder, f"{_id}.yar")
+    try:
+        os.remove(full_path)
+    except FileNotFoundError:
+        Response(
+            status=status.HTTP_404_NOT_FOUND,
+            data={'error': 'Yara not found'}
+        )
+
+    return Response(status=status.HTTP_200_OK)
