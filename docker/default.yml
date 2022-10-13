@@ -63,6 +63,7 @@ services:
     restart: unless-stopped
     volumes:
       - ../configuration:/opt/deploy/intel_owl/configuration
+      - ../custom_ruleset:/opt/deploy/yara/custom_ruleset
       - generic_logs:/var/log/intel_owl
       - shared_files:/opt/deploy/files_required
     entrypoint:
@@ -83,11 +84,11 @@ services:
     stop_grace_period: 3m
     volumes:
       - ../configuration:/opt/deploy/intel_owl/configuration
+      - ../custom_ruleset:/opt/deploy/yara/custom_ruleset
       - generic_logs:/var/log/intel_owl
       - shared_files:/opt/deploy/files_required
     entrypoint:
       - ./docker/entrypoints/celery_default.sh
-      - ../custom_ruleset:/opt/deploy/yara/custom_ruleset
     logging:
       driver: "json-file"
       options:

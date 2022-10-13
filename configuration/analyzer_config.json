@@ -1060,7 +1060,7 @@
     "type": "file",
     "python_module": "filescan.FileScanUpload",
     "description": "Extract IoCs from executable files, documents and scripts via [FileScan.io API](https://www.filescan.io/api/docs).",
-    "disabled": false,
+    "disabled": true,
     "external_service": true,
     "leaks_info": false,
     "config": {
@@ -3609,7 +3609,7 @@
     "type": "file",
     "python_module": "vt.vt3_get.VirusTotalv3",
     "description": "check file hash on VirusTotal",
-    "disabled": false,
+    "disabled": true,
     "external_service": true,
     "leaks_info": false,
     "run_hash": true,
@@ -4513,7 +4513,7 @@
     "secrets": {},
     "config": {
       "queue": "default",
-      "soft_time_limit": 100
+      "soft_time_limit": 60
     },
     "params": {
       "directories_with_rules": {
@@ -4522,6 +4522,11 @@
         ],
         "type": "list",
         "description": ""
+      },
+      "update": {
+        "value": false,
+        "type": "bool",
+        "description": "This is set to false because these rules are local so they don't need any update"
       }
     }
   }
