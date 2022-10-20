@@ -3495,7 +3495,7 @@
     "type": "observable",
     "python_module": "virushee.VirusheeCheckHash",
     "description": "Search for a previous analysis of a file by its hash (SHA256/SHA1/MD5) on [Virushee API](https://api.virushee.com/).",
-    "disabled": false,
+    "disabled": true,
     "external_service": true,
     "leaks_info": false,
     "observable_supported": ["hash"],
