@@ -866,7 +866,7 @@
     "type": "observable",
     "python_module": "docguard_get.DocGuard_Hash",
     "description": "check if an hash was analyzed on DocGuard. [DocGuard](https://www.docguard.io)",
-    "disabled": false,
+    "disabled": true,
     "external_service": true,
     "leaks_info": false,
     "observable_supported": ["hash"],
@@ -1074,7 +1074,7 @@
     "type": "observable",
     "python_module": "filescan_search.FileScanSearch",
     "description": "Finds reports and uploaded files by various tokens, like hash, filename, verdict, IOCs etc via [FileScan.io API](https://www.filescan.io/api/docs).",
-    "disabled": false,
+    "disabled": true,
     "external_service": true,
     "leaks_info": false,
     "observable_supported": ["url", "domain", "ip", "generic", "hash"],
@@ -1875,7 +1875,7 @@
       "multipart/x-zip"
     ],
     "config": {
-      "soft_time_limit": 30,
+      "soft_time_limit": 600,
       "queue": "long"
     },
     "secrets": {
@@ -1896,7 +1896,7 @@
     "leaks_info": false,
     "run_hash": true,
     "config": {
-      "soft_time_limit": 50,
+      "soft_time_limit": 300,
       "queue": "default"
     },
     "secrets": {},
@@ -4402,7 +4402,7 @@
       "hash"
     ],
     "config": {
-      "soft_time_limit": 30,
+      "soft_time_limit": 300,
       "queue": "default"
     },
     "secrets": {
