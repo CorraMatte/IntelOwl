@@ -1,8 +1,9 @@
 # This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
 # See the file 'LICENSE' for copying permission.
-
+import grp
 import logging
 import os
+import pwd
 from copy import deepcopy
 from datetime import timedelta
 from typing import Type, Union
@@ -839,6 +840,11 @@ def add_yara(request):
     with open(full_path, 'w') as f:
         f.write(body)
 
+    uid = pwd.getpwnam("www-data").pw_uid
+    gid = grp.getgrnam("www-data").gr_gid
+
+    os.chown(full_path, uid, gid)
+
     return Response(status=status.HTTP_201_CREATED, data={'path': full_path})
 
 
@@ -857,7 +863,6 @@ def clean_up_yara(request):
 
     for f in os.listdir(folder):
         full_path = os.path.join(folder, f)
-        print(full_path)
         os.remove(full_path)
 
     return Response(status=status.HTTP_200_OK)
