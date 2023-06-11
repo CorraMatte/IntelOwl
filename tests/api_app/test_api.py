@@ -8,30 +8,17 @@ from typing import Tuple
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.management import call_command
-from django.test import TestCase
-from rest_framework.test import APIClient
 
 from api_app import models
+
+from .. import CustomAPITestCase
 
 User = get_user_model()
 
 
-class ApiViewTests(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super(ApiViewTests, cls).setUpClass()
-        if User.objects.filter(username="test").exists():
-            User.objects.get(username="test").delete()
-        cls.superuser = User.objects.create_superuser(
-            username="test", email="test@intelowl.com", password="test"
-        )
-        call_command("migrate_secrets")
-
+class ApiViewTests(CustomAPITestCase):
     def setUp(self):
-        self.client = APIClient()
-        self.client.force_authenticate(user=self.superuser)
-
+        super().setUp()
         self.uploaded_file, self.file_md5 = self.__get_test_file("file.exe")
         self.uploaded_file2, self.file_md52 = self.__get_test_file("file.exe")
         self.analyze_file_data = {
@@ -40,6 +27,7 @@ class ApiViewTests(TestCase):
                 "File_Info",
                 "PE_Info",
             ],
+            "connectors_requested": [],
             "file_name": "file.exe",
             "file_mimetype": "application/x-dosexec",
         }
@@ -50,6 +38,7 @@ class ApiViewTests(TestCase):
                 "File_Info",
                 "PE_Info",
             ],
+            "connectors_requested": [],
             "file_mimetypes": [
                 "application/x-dosexec",
                 "application/x-dosexec",
@@ -67,9 +56,8 @@ class ApiViewTests(TestCase):
         ).hexdigest()
         self.analyze_observable_ip_data = {
             "observable_name": self.observable_name,
-            "analyzers_requested": [
-                "IPInfo",
-            ],
+            "analyzers_requested": ["AbuseIPDB", "Stratosphere_Blacklist"],
+            "connectors_requested": [],
             "observable_classification": "ip",
         }
         self.mixed_observable_data = {
@@ -78,9 +66,9 @@ class ApiViewTests(TestCase):
                 ["domain", "example.com"],
                 ["ip", "8.8.2.2"],
             ],
-            "analyzers_requested": ["Classic_DNS", "Robtex_IP_Query"],
+            "analyzers_requested": ["Classic_DNS", "WhoIs_RipeDB_Search"],
             "connectors_requested": [],
-            "tlp": "WHITE",
+            "tlp": "CLEAR",
             "runtime_configuration": {},
             "tags_labels": [],
         }
@@ -98,7 +86,7 @@ class ApiViewTests(TestCase):
 
     def test_ask_analysis_availability(self):
         md5 = os.environ.get("TEST_MD5", "446c5fbb11b9ce058450555c1c27153c")
-        analyzers_needed = ["Fortiguard", "CIRCLPassiveDNS"]
+        analyzers_needed = ["Classic_DNS", "CIRCLPassiveDNS"]
         data = {"md5": md5, "analyzers": analyzers_needed, "minutes_ago": 1}
         response = self.client.post(
             "/api/ask_analysis_availability", data, format="json"
@@ -136,9 +124,11 @@ class ApiViewTests(TestCase):
         self.assertEqual(file_name, job.file_name)
         self.assertEqual(file_mimetype, job.file_mimetype)
         self.assertEqual(md5, job.md5)
-        self.assertListEqual(analyzers_requested, job.analyzers_requested)
         # there is only Suricata right now
-        self.assertListEqual(["Suricata"], job.analyzers_to_execute)
+        self.assertCountEqual(
+            ["Suricata"],
+            list(job.analyzers_to_execute.all().values_list("name", flat=True)),
+        )
 
     def test_analyze_file__corrupted_sample(self):
         analyzers_requested = [
@@ -164,7 +154,10 @@ class ApiViewTests(TestCase):
         self.assertEqual(file_name, job.file_name)
         self.assertEqual(file_mimetype, job.file_mimetype)
         self.assertEqual(md5, job.md5)
-        self.assertListEqual(analyzers_requested, job.analyzers_requested)
+        self.assertCountEqual(
+            analyzers_requested,
+            list(job.analyzers_requested.all().values_list("name", flat=True)),
+        )
 
     def test_analyze_file__exe(self):
         data = self.analyze_file_data.copy()
@@ -177,8 +170,10 @@ class ApiViewTests(TestCase):
         self.assertEqual(response.status_code, 200, msg=msg)
         self.assertEqual(data["file_name"], job.file_name, msg=msg)
         self.assertEqual(data["file_mimetype"], job.file_mimetype, msg=msg)
-        self.assertListEqual(
-            data["analyzers_requested"], job.analyzers_requested, msg=msg
+        self.assertCountEqual(
+            data["analyzers_requested"],
+            list(job.analyzers_requested.all().values_list("name", flat=True)),
+            msg=msg,
         )
         self.assertEqual(self.file_md5, job.md5, msg=msg)
 
@@ -194,15 +189,17 @@ class ApiViewTests(TestCase):
         job_id = int(content["job_id"])
         job = models.Job.objects.get(pk=job_id)
         self.assertEqual(data["file_name"], job.file_name, msg=msg)
-        self.assertListEqual(
-            data["analyzers_requested"], job.analyzers_requested, msg=msg
+        self.assertCountEqual(
+            data["analyzers_requested"],
+            list(job.analyzers_requested.all().values_list("name", flat=True)),
+            msg=msg,
         )
         self.assertEqual(file_mimetype, job.file_mimetype, msg=msg)
         self.assertEqual(self.file_md5, job.md5, msg=msg)
 
     def test_analyze_observable__domain(self):
         analyzers_requested = [
-            "Fortiguard",
+            "Classic_DNS",
         ]
         observable_name = os.environ.get("TEST_DOMAIN", "google.com")
         md5 = hashlib.md5(observable_name.encode("utf-8")).hexdigest()
@@ -210,6 +207,7 @@ class ApiViewTests(TestCase):
         data = {
             "observable_name": observable_name,
             "analyzers_requested": analyzers_requested,
+            "connectors_requested": [],
             "observable_classification": observable_classification,
             "tags_labels": ["test1", "test2"],
         }
@@ -224,8 +222,11 @@ class ApiViewTests(TestCase):
         self.assertEqual(observable_name, job.observable_name)
         self.assertEqual(observable_classification, job.observable_classification)
         self.assertEqual(md5, job.md5)
-        self.assertListEqual(analyzers_requested, job.analyzers_requested)
-        self.assertListEqual(
+        self.assertCountEqual(
+            analyzers_requested,
+            list(job.analyzers_requested.all().values_list("name", flat=True)),
+        )
+        self.assertCountEqual(
             data["tags_labels"], list(job.tags.values_list("label", flat=True))
         )
 
@@ -240,8 +241,10 @@ class ApiViewTests(TestCase):
         job_id = int(content["job_id"])
         job = models.Job.objects.get(pk=job_id)
         self.assertEqual(data["observable_name"], job.observable_name, msg=msg)
-        self.assertListEqual(
-            data["analyzers_requested"], job.analyzers_requested, msg=msg
+        self.assertCountEqual(
+            data["analyzers_requested"],
+            list(job.analyzers_requested.all().values_list("name", flat=True)),
+            msg=msg,
         )
         self.assertEqual(
             data["observable_classification"], job.observable_classification, msg=msg
@@ -262,8 +265,10 @@ class ApiViewTests(TestCase):
         job_id = int(content["job_id"])
         job = models.Job.objects.get(pk=job_id)
         self.assertEqual(data["observable_name"], job.observable_name, msg=msg)
-        self.assertListEqual(
-            data["analyzers_requested"], job.analyzers_requested, msg=msg
+        self.assertCountEqual(
+            data["analyzers_requested"],
+            list(job.analyzers_requested.all().values_list("name", flat=True)),
+            msg=msg,
         )
         self.assertEqual(
             observable_classification, job.observable_classification, msg=msg
@@ -285,11 +290,15 @@ class ApiViewTests(TestCase):
         job_id = int(content["job_id"])
         job = models.Job.objects.get(pk=job_id)
         self.assertEqual(data["observables"][0][1], job.observable_name, msg=msg)
-        self.assertListEqual(
-            data["analyzers_requested"], job.analyzers_requested, msg=msg
+        self.assertCountEqual(
+            data["analyzers_requested"],
+            list(job.analyzers_requested.all().values_list("name", flat=True)),
+            msg=msg,
         )
-        self.assertListEqual(
-            data["analyzers_requested"], job.analyzers_to_execute, msg=msg
+        self.assertCountEqual(
+            data["analyzers_requested"],
+            list(job.analyzers_to_execute.all().values_list("name", flat=True)),
+            msg=msg,
         )
 
         content = contents["results"][1]
@@ -297,8 +306,10 @@ class ApiViewTests(TestCase):
         job_id = int(content["job_id"])
         job = models.Job.objects.get(pk=job_id)
         self.assertEqual(data["observables"][1][1], job.observable_name, msg=msg)
-        self.assertListEqual(
-            [data["analyzers_requested"][0]], job.analyzers_to_execute, msg=msg
+        self.assertCountEqual(
+            [data["analyzers_requested"][0]],
+            list(job.analyzers_to_execute.all().values_list("name", flat=True)),
+            msg=msg,
         )
 
     def test_download_sample_200(self):
@@ -359,14 +370,14 @@ class ApiViewTests(TestCase):
         contents = response.json()
         msg = (response.status_code, contents)
         self.assertEqual(response.status_code, 400, msg=msg)
-        error = contents["errors"][0]
+        error = contents["errors"]["detail"][0]
         self.assertEqual(error["tlp"][0], '"incorrect" is not a valid choice.', msg=msg)
-        error = contents["errors"][1]
+        error = contents["errors"]["detail"][1]
         self.assertEqual(error["tlp"][0], '"incorrect" is not a valid choice.', msg=msg)
 
     def test_ask_multi_analysis_availability(self):
         md5 = os.environ.get("TEST_MD5", "446c5fbb11b9ce058450555c1c27153c")
-        analyzers_needed = ["Fortiguard", "CIRCLPassiveDNS"]
+        analyzers_needed = ["Classic_DNS", "CIRCLPassiveDNS"]
         data = [{"md5": md5, "analyzers": analyzers_needed, "minutes_ago": 1}]
         response = self.client.post(
             "/api/ask_multi_analysis_availability", data, format="json"
@@ -389,8 +400,10 @@ class ApiViewTests(TestCase):
             self.assertEqual(
                 self.analyze_multiple_files_filenames[index], job.file_name, msg=msg
             )
-            self.assertListEqual(
-                data["analyzers_requested"], job.analyzers_requested, msg=msg
+            self.assertCountEqual(
+                data["analyzers_requested"],
+                list(job.analyzers_requested.all().values_list("name", flat=True)),
+                msg=msg,
             )
             self.assertEqual(self.file_md5, job.md5, msg=msg)
             self.assertEqual(data["file_mimetypes"][index], job.file_mimetype, msg=msg)
@@ -412,8 +425,29 @@ class ApiViewTests(TestCase):
             self.assertEqual(
                 self.analyze_multiple_files_filenames[index], job.file_name, msg=msg
             )
-            self.assertListEqual(
-                data["analyzers_requested"], job.analyzers_requested, msg=msg
+            self.assertCountEqual(
+                data["analyzers_requested"],
+                list(job.analyzers_requested.all().values_list("name", flat=True)),
+                msg=msg,
             )
             self.assertEqual(self.file_md5, job.md5, msg=msg)
             self.assertEqual(file_mimetypes[index], job.file_mimetype, msg=msg)
+
+    def test_tlp_clear_and_white(self):
+        data = self.analyze_observable_ip_data.copy()  # tlp = "CLEAR" by default
+        response = self.client.post("/api/analyze_observable", data, format="json")
+        contents = response.json()
+        msg = (response.status_code, contents)
+        self.assertEqual(response.status_code, 200, msg=msg)
+        job_id = int(contents["job_id"])
+        job = models.Job.objects.get(pk=job_id)
+        self.assertEqual(job.tlp, "CLEAR", msg=msg)
+
+        data["tlp"] = "CLEAR"
+        response = self.client.post("/api/analyze_observable", data, format="json")
+        contents = response.json()
+        msg = (response.status_code, contents)
+        self.assertEqual(response.status_code, 200, msg=msg)
+        job_id = int(contents["job_id"])
+        job = models.Job.objects.get(pk=job_id)
+        self.assertEqual(job.tlp, "CLEAR", msg=msg)

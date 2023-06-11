@@ -1,3 +1,6 @@
+# This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
+# See the file 'LICENSE' for copying permission.
+
 # Security Stuff
 from django.core.management.utils import get_random_secret_key
 
@@ -7,7 +10,7 @@ from .commons import WEB_CLIENT_DOMAIN
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = get_secret("DJANGO_SECRET", None) or get_random_secret_key()
 
-HTTPS_ENABLED = get_secret("HTTPS_ENABLED", False)
+HTTPS_ENABLED = get_secret("HTTPS_ENABLED", False) == "True"
 if HTTPS_ENABLED:
     CSRF_COOKIE_SECURE = True
     SESSION_COOKIE_SECURE = True

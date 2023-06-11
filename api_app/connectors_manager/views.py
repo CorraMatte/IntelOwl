@@ -3,17 +3,8 @@
 
 import logging
 
-from drf_spectacular.utils import extend_schema as add_docs
-from drf_spectacular.utils import inline_serializer
-from rest_framework import serializers as rfs
-from rest_framework import status
-from rest_framework.response import Response
+from api_app.core.views import AbstractConfigAPI, PluginActionViewSet
 
-from api_app.core.views import PluginActionViewSet, PluginHealthCheckAPI
-from certego_saas.ext.views import APIView
-
-from ..models import OrganizationPluginState, PluginConfig
-from . import controller as connectors_controller
 from .models import ConnectorReport
 from .serializers import ConnectorConfigSerializer
 
@@ -21,61 +12,23 @@ logger = logging.getLogger(__name__)
 
 
 __all__ = [
-    "ConnectorListAPI",
+    "ConnectorConfigAPI",
     "ConnectorActionViewSet",
-    "ConnectorHealthCheckAPI",
 ]
 
 
-class ConnectorListAPI(APIView):
-
+class ConnectorConfigAPI(AbstractConfigAPI):
     serializer_class = ConnectorConfigSerializer
-
-    @add_docs(
-        description="Get and parse the `connector_config.json` file",
-        parameters=[],
-        responses={
-            200: ConnectorConfigSerializer,
-            500: inline_serializer(
-                name="GetConnectorConfigsFailedResponse",
-                fields={"error": rfs.StringRelatedField()},
-            ),
-        },
-    )
-    def get(self, request, *args, **kwargs):
-        try:
-            cc = self.serializer_class.read_and_verify_config()
-            PluginConfig.apply(cc, request.user, PluginConfig.PluginType.CONNECTOR)
-            OrganizationPluginState.apply(
-                cc, request.user, PluginConfig.PluginType.CONNECTOR
-            )
-            return Response(cc, status=status.HTTP_200_OK)
-        except Exception as e:
-            logger.exception(
-                f"get_connector_configs requester:{str(request.user)} error:{e}."
-            )
-            return Response(
-                {"error": "error in get_connector_configs. Check logs."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
 
 class ConnectorActionViewSet(PluginActionViewSet):
-    queryset = ConnectorReport.objects.all()
-
+    @classmethod
     @property
-    def report_model(self):
+    def report_model(cls):
         return ConnectorReport
 
     def perform_retry(self, report: ConnectorReport):
-        connectors_to_execute, runtime_configuration = super().perform_retry(report)
-        connectors_controller.start_connectors(
-            report.job.id,
-            connectors_to_execute,
-            runtime_configuration,
+        signature = report.config.get_signature(
+            report.job,
         )
-
-
-class ConnectorHealthCheckAPI(PluginHealthCheckAPI):
-    def perform_healthcheck(self, connector_name: str) -> bool:
-        return connectors_controller.run_healthcheck(connector_name)
+        signature.apply_async()

@@ -5,6 +5,7 @@ import argparse
 import os
 import re
 import subprocess
+import sys
 
 try:
     from dotenv import load_dotenv
@@ -14,13 +15,14 @@ except ImportError:
         "you must install the Python requirements."
         " See: https://intelowl.readthedocs.io/en/latest/Installation.html"
     )
-    exit(2)
+    sys.exit(2)
 
-CURRENT_VERSION = "4.1.2"
+
+load_dotenv("docker/.env")
+CURRENT_VERSION = os.getenv("REACT_APP_INTELOWL_VERSION", "").replace("v", "")
 
 DOCKER_ANALYZERS = [
     "tor_analyzers",
-    "rendertron",
     "malware_tools_analyzers",
     "cyberchef",
     "pcap_analyzers",
@@ -28,6 +30,8 @@ DOCKER_ANALYZERS = [
 
 PATH_MAPPING = {
     "default": "docker/default.yml",
+    "postgres": "docker/postgres.override.yml",
+    "rabbitmq": "docker/rabbitmq.override.yml",
     "test": "docker/test.override.yml",
     "ci": "docker/ci.override.yml",
     "custom": "docker/custom.override.yml",
@@ -38,6 +42,7 @@ PATH_MAPPING = {
     "test_flower": "docker/test.flower.override.yml",
     "elastic": "docker/elasticsearch.override.yml",
     "https": "docker/https.override.yml",
+    "nfs": "docker/nfs.override.yml",
 }
 # to fix the box-js folder name
 PATH_MAPPING.update(
@@ -55,8 +60,9 @@ PATH_MAPPING["all_analyzers.test"] = [
 ]
 
 
-def version_regex(arg_value, pat=re.compile(r"^[3-4]\.[0-9]{1,2}.[0-9]{1,2}$")):
+def version_regex(arg_value, pat=re.compile(r"^[3-9]\.[0-9]{1,2}.[0-9]{1,2}$")):
     if not pat.match(arg_value):
+        print(f"type error for version {arg_value}")
         raise argparse.ArgumentTypeError
     return arg_value
 
@@ -91,7 +97,7 @@ def start():
         type=version_regex,
         default=CURRENT_VERSION,
         help="choose the version you would like to install (>=3.0.0)."
-        " Works only in 'prod' mode",
+        " Works only in 'prod' mode. Default version is the most recently released.",
     )
     # integrations
     parser.add_argument(
@@ -116,10 +122,28 @@ def start():
         help="Uses the multiqueue.override.yml compose file",
     )
     parser.add_argument(
+        "--nfs",
+        required=False,
+        action="store_true",
+        help="Uses the nfs.override.yml compose file",
+    )
+    parser.add_argument(
         "--traefik",
         required=False,
         action="store_true",
         help="Uses the traefik.override.yml compose file",
+    )
+    parser.add_argument(
+        "--use-external-database",
+        required=False,
+        action="store_true",
+        help="Do not use postgres.override.yml compose file",
+    )
+    parser.add_argument(
+        "--use-external-broker",
+        required=False,
+        action="store_true",
+        help="Do not use rabbitmq.override.yml compose file",
     )
     parser.add_argument(
         "--flower",
@@ -153,6 +177,12 @@ def start():
         help="This leverage the https.override.yml file that can be used "
         "to host IntelOwl with HTTPS and your own certificate",
     )
+    parser.add_argument(
+        "--use-docker-v1",
+        required=False,
+        action="store_true",
+        help="This flag avoids the script to check if it can use Docker v2 every time",
+    )
 
     args, unknown = parser.parse_known_args()
     # logic
@@ -174,15 +204,25 @@ def start():
         return
     # default file
     compose_files = [PATH_MAPPING["default"]]
+    # PostreSQL
+    if not args.__dict__["use_external_database"]:
+        compose_files.append(PATH_MAPPING["postgres"])
+    # RabbitMQ
+    if not args.__dict__["use_external_broker"]:
+        compose_files.append(PATH_MAPPING["rabbitmq"])
     # mode
     if is_test:
         compose_files.append(PATH_MAPPING[args.mode])
-    if args.__dict__["elastic"]:
-        compose_files.append(PATH_MAPPING["elastic"])
-    if args.__dict__["https"]:
-        compose_files.append(PATH_MAPPING["https"])
     # upgrades
-    for key in ["traefik", "multi_queue", "custom", "flower"]:
+    for key in [
+        "elastic",
+        "https",
+        "nfs",
+        "traefik",
+        "multi_queue",
+        "custom",
+        "flower",
+    ]:
         if args.__dict__[key]:
             compose_files.append(PATH_MAPPING[key])
     # additional compose files for tests
@@ -220,6 +260,17 @@ def start():
         "--project-directory",
         "docker",
     ]
+
+    if not args.use_docker_v1:
+        # check docker version and use docker 2 if available
+        cmd = "docker --help | grep 'compose'"
+        ps = subprocess.Popen(
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+        )
+        output = ps.communicate()[0]
+        if output:
+            base_command = ["docker", "compose"] + base_command[1:]
+
     for compose_file in compose_files:
         base_command.append("-f")
         base_command.append(compose_file)
@@ -230,14 +281,14 @@ def start():
         env["DOCKER_BUILDKIT"] = "1"
         if args.debug_build:
             env["BUILDKIT_PROGRESS"] = "plain"
-        subprocess.run(command, env=env)
+        subprocess.run(command, env=env, check=True)
     except KeyboardInterrupt:
         print(
             "---- removing the containers, please wait... ",
             "(press Ctrl+C again to force) ----",
         )
         try:
-            subprocess.run(base_command + ["down"])
+            subprocess.run(base_command + ["down"], check=True)
         except KeyboardInterrupt:
             # just need to catch it
             pass

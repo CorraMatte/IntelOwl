@@ -10,7 +10,7 @@ services:
       - CELERY_QUEUES=default,local,long
 
   celery_worker_local:
-    image: intelowlproject/intelowl:${INTELOWL_TAG_VERSION}
+    image: intelowlproject/intelowl:${REACT_APP_INTELOWL_VERSION}
     container_name: intelowl_celery_worker_local
     restart: unless-stopped
     stop_grace_period: 3m
@@ -23,13 +23,11 @@ services:
     env_file:
       - env_file_app
     depends_on:
-      - rabbitmq
-      - postgres
       - uwsgi
     <<: *no-healthcheck
 
   celery_worker_long:
-    image: intelowlproject/intelowl:${INTELOWL_TAG_VERSION}
+    image: intelowlproject/intelowl:${REACT_APP_INTELOWL_VERSION}
     container_name: intelowl_celery_worker_long
     restart: unless-stopped
     stop_grace_period: 3m
@@ -42,8 +40,6 @@ services:
     env_file:
       - env_file_app
     depends_on:
-      - rabbitmq
-      - postgres
       - uwsgi
     <<: *no-healthcheck
 

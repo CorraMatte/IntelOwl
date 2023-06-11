@@ -4,15 +4,13 @@
 import requests
 
 from api_app.analyzers_manager import classes
-from api_app.exceptions import AnalyzerRunException
-from tests.mock_utils import MockResponse, if_mock_connections, patch
+from api_app.analyzers_manager.exceptions import AnalyzerRunException
+from tests.mock_utils import MockUpResponse, if_mock_connections, patch
 
 
 class Threatminer(classes.ObservableAnalyzer):
     base_url = "https://api.threatminer.org/v2/"
-
-    def set_params(self, params):
-        self.rt_value = params.get("rt_value", "")
+    rt_value: str
 
     def run(self):
         params = {"q": self.observable_name}
@@ -23,10 +21,12 @@ class Threatminer(classes.ObservableAnalyzer):
             uri = "domain.php"
         elif self.observable_classification == self.ObservableTypes.IP:
             uri = "host.php"
+        elif self.observable_classification == self.ObservableTypes.HASH:
+            uri = "sample.php"
         else:
             raise AnalyzerRunException(
-                f"not supported observable type {self.observable_classification}. "
-                "Supported are IP and Domain"
+                "Unable to retrieve the uri for classification"
+                f" {self.observable_classification}"
             )
 
         try:
@@ -43,7 +43,7 @@ class Threatminer(classes.ObservableAnalyzer):
             if_mock_connections(
                 patch(
                     "requests.get",
-                    return_value=MockResponse({}, 200),
+                    return_value=MockUpResponse({}, 200),
                 ),
             )
         ]

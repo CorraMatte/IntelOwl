@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 /* eslint-disable react/prop-types */
 import React from "react";
 
@@ -16,20 +17,27 @@ import {
   ALL_CLASSIFICATIONS,
 } from "../../../constants";
 
+const process_time_mmss = (value) =>
+  new Date(value * 1000).toISOString().substring(14, 19);
+
 const jobTableColumns = [
   {
-    Header: () => null, // No header
-    id: "viewJobBtnHeader",
+    Header: () => "ID", // No header
+    id: "id",
     accessor: "id",
-    maxWidth: 50,
+    maxWidth: 75,
     disableSortBy: true,
     Cell: ({ value: id }) => (
-      <LinkOpenViewIcon
-        id={id}
-        href={`/jobs/${id}`}
-        tooltip="View Job Report"
-      />
+      <div className="d-flex flex-column justify-content-center">
+        <p>#{id}</p>
+        <LinkOpenViewIcon
+          id={id}
+          href={`/jobs/${id}`}
+          tooltip="View Job Report"
+        />
+      </div>
     ),
+    Filter: DefaultColumnFilter,
   },
   {
     Header: "Created",
@@ -38,7 +46,7 @@ const jobTableColumns = [
     Cell: ({ value }) => (
       <DateHoverable ago value={value} format="hh:mm:ss a MMM do, yyyy" />
     ),
-    maxWidth: 125,
+    maxWidth: 100,
   },
   {
     Header: "Finished",
@@ -48,7 +56,7 @@ const jobTableColumns = [
       value && (
         <DateHoverable ago value={value} format="hh:mm:ss a MMM do, yyyy" />
       ),
-    maxWidth: 125,
+    maxWidth: 100,
   },
   {
     Header: "User",
@@ -100,6 +108,7 @@ const jobTableColumns = [
         id: "type",
         accessor: (r) => r.observable_classification || r.file_mimetype,
         disableSortBy: true,
+        maxWidth: 100,
         Filter: SelectOptionsFilter,
         selectOptions: ALL_CLASSIFICATIONS,
       },
@@ -111,6 +120,7 @@ const jobTableColumns = [
         disableSortBy: true,
         Filter: SelectOptionsFilter,
         selectOptions: TLP_CHOICES,
+        maxWidth: 100,
       },
       {
         Header: "Tags",
@@ -125,6 +135,7 @@ const jobTableColumns = [
             />
           )),
         disableSortBy: true,
+        maxWidth: 100,
         Filter: DefaultColumnFilter,
         filterValueAccessorFn: (tags) => tags.map((t) => t.label),
       },
@@ -140,32 +151,24 @@ const jobTableColumns = [
         Cell: ({ value: job }) => (
           <div className="d-flex flex-column justify-content-center">
             <span>
-              {job.analyzers_to_execute.length}/
-              {job.analyzers_requested.length ||
-                (job.playbooks_to_execute.length > 0
-                  ? job.analyzers_to_execute.length
-                  : "all")}{" "}
+              {job.analyzers_to_execute.length}/{job.analyzers_requested.length}{" "}
               analyzers
             </span>
             <span>
               {job.connectors_to_execute.length}/
               {job.connectors_requested.length} connectors
             </span>
-
-            <span>
-              {job.playbooks_to_execute.length}/
-              {job.playbooks_to_execute.length} playbooks
-            </span>
+            <span>{job.visualizers_to_execute.length}/all visualizers</span>
           </div>
         ),
         disableSortBy: true,
         maxWidth: 175,
       },
       {
-        Header: "Process Time (s)",
+        Header: "Process Time (mm:ss)",
         id: "process_time",
         accessor: "process_time",
-        disableSortBy: true,
+        Cell: ({ value }) => <span>{process_time_mmss(value)}</span>,
         maxWidth: 125,
       },
       {

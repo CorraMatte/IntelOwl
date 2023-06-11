@@ -6,22 +6,20 @@ WORKDIR /
 # copy react source code
 COPY frontend/ .
 # copy version file as an env file
-COPY docker/.version .env.local
+COPY docker/.env .env.local
 # install and build
 RUN npm install npm@latest --location=global \
     && npm install \
     && PUBLIC_URL=/static/reactapp/ npm run build
 
 # Stage 2: Backend
-FROM python:3.9.9-buster
-
-COPY --from=frontend-build /build /var/www/reactapp
+FROM python:3.9.16
 
 ENV PYTHONUNBUFFERED 1
 ENV DJANGO_SETTINGS_MODULE intel_owl.settings
 ENV PYTHONPATH /opt/deploy/intel_owl
 ENV LOG_PATH /var/log/intel_owl
-ENV ELASTICSEARCH_DSL_VERSION 7.2.0
+ENV ELASTICSEARCH_DSL_VERSION 7.2.2
 ENV watch_logs_cmd "watch -n1 tail -n10 /var/log/intel_owl/django/api_app.log"
 
 ARG REPO_DOWNLOADER_ENABLED=true
@@ -30,18 +28,22 @@ ARG WATCHMAN=false
 RUN mkdir -p ${LOG_PATH} \
     ${LOG_PATH}/django \
     ${LOG_PATH}/uwsgi \
-    /opt/deploy/files_required /opt/deploy/yara /opt/deploy/configuration
+    /opt/deploy/files_required /opt/deploy/files_required/yara /opt/deploy/configuration
 
 # install required packages. some notes about:o
 # python3-psycopg2 is required to use PostgresSQL with Django
-# osslsigncode is required to run the signature verification analyzer
 # apache2-utils is required to execute htpasswd
 RUN apt-get update \
     && apt-get install -y --no-install-recommends apt-utils libsasl2-dev libssl-dev netcat \
-    vim libldap2-dev python-dev libfuzzy-dev net-tools python3-psycopg2 git osslsigncode apache2-utils \
+    vim libldap2-dev python-dev libfuzzy-dev net-tools python3-psycopg2 git apache2-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install --no-cache-dir --upgrade pip
+
+# perl not interactive
+ENV PERL_MM_USE_DEFAULT 1
+# msgconvert
+RUN cpan -T Email::Outlook::Message
 
 COPY requirements/project-requirements.txt $PYTHONPATH/project-requirements.txt
 COPY requirements/certego-requirements.txt $PYTHONPATH/certego-requirements.txt
@@ -54,15 +56,20 @@ RUN pip3 install --no-cache-dir --compile -r project-requirements.txt \
 
 COPY . $PYTHONPATH
 
+COPY --from=frontend-build /build /var/www/reactapp
+
 RUN touch ${LOG_PATH}/django/api_app.log ${LOG_PATH}/django/api_app_errors.log \
     && touch ${LOG_PATH}/django/celery.log ${LOG_PATH}/django/celery_errors.log \
-    && touch ${LOG_PATH}/django/django_auth_ldap.log \
+    && touch ${LOG_PATH}/django/django_auth_ldap.log ${LOG_PATH}/django/django_errors.log \
+    && touch ${LOG_PATH}/django/certego_saas.log ${LOG_PATH}/django/certego_saas_errors.log \
+    && touch ${LOG_PATH}/django/authentication.log ${LOG_PATH}/django/authentication_errors.log \
     && chown -R www-data:www-data ${LOG_PATH} /opt/deploy/ \
     # this is cause stringstifer creates this directory during the build and cause celery to crash
     && rm -rf /root/.local \
     && ${PYTHONPATH}/docker/scripts/watchman_install.sh \
-    # download yara rules and quark engine rules
-    && ${PYTHONPATH}/api_app/analyzers_manager/repo_downloader.sh
+    # download github stuff
+    && ${PYTHONPATH}/api_app/analyzers_manager/repo_downloader.sh \
+
 
 # quarkengine calls
 # HOME_DIR = f"{Path.home()}/.quark-engine/"
@@ -70,4 +77,4 @@ RUN touch ${LOG_PATH}/django/api_app.log ${LOG_PATH}/django/api_app_errors.log \
 # so we have to set the home env variable to allow to reate its directory
 ENV HOME ${PYTHONPATH}
 
-HEALTHCHECK --interval=5s --timeout=2s --start-period=20s CMD nc -z localhost 8001 || exit 1
+HEALTHCHECK --interval=10s --timeout=2s --start-period=40s --retries=5 CMD nc -z localhost 8001 || exit 1

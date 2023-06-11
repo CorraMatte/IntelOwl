@@ -1,3 +1,4 @@
+permissions: read-all
 # For most projects, this workflow file will not need changing; you simply need
 # to commit it to your repository.
 #
@@ -6,8 +7,6 @@
 name: "CodeQL"
 
 on:
-  push:
-    branches: [master, develop]
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [master, develop]
@@ -35,13 +34,14 @@ jobs:
         fetch-depth: 2
 
     - name: Set up Python
-      uses: actions/setup-python@v4.3.0
+      uses: actions/setup-python@v4.6.1
       with:
         python-version: '3.9'
+
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends apt-utils libsasl2-dev libssl-dev libldap2-dev python-dev libfuzzy-dev net-tools git osslsigncode exiftool
+        sudo apt-get install -y --no-install-recommends apt-utils libsasl2-dev libssl-dev libldap2-dev python-dev-is-python3 libfuzzy-dev net-tools git libcurl4-openssl-dev
         python -m pip install --upgrade pip
         if [ -f requirements/project-requirements.txt ];
         then pip install -r requirements/project-requirements.txt;

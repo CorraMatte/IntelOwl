@@ -1,7 +1,8 @@
 import React, { Suspense } from "react";
 import { AiOutlineApi } from "react-icons/ai";
 import { BsPeopleFill, BsSliders } from "react-icons/bs";
-import { TiFlowChildren } from "react-icons/ti";
+import { TiFlowChildren, TiBook } from "react-icons/ti";
+import { IoIosEye } from "react-icons/io";
 
 import {
   RouterTabs,
@@ -14,6 +15,7 @@ import { useOrganizationStore } from "../../stores";
 
 const Analyzers = React.lazy(() => import("./utils/Analyzers"));
 const Connectors = React.lazy(() => import("./utils/Connectors"));
+const Visualizers = React.lazy(() => import("./utils/Visualizers"));
 const Playbooks = React.lazy(() => import("./utils/Playbooks"));
 
 const routes = [
@@ -48,11 +50,26 @@ const routes = [
     ),
   },
   {
+    key: "plugins-visualizers",
+    location: "visualizers",
+    Title: () => (
+      <span>
+        <IoIosEye />
+        &nbsp;Visualizers
+      </span>
+    ),
+    Component: () => (
+      <Suspense fallback={<FallBackLoading />}>
+        <Visualizers />
+      </Suspense>
+    ),
+  },
+  {
     key: "plugins-playbooks",
     location: "playbooks",
     Title: () => (
       <span>
-        <TiFlowChildren />
+        <TiBook />
         &nbsp;Playbooks
       </span>
     ),

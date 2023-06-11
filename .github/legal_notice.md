@@ -1,11 +1,12 @@
 ## Legal notice
 
 You as a user of this project must review, accept and comply with the license
-terms of each downloaded/installed package listed below. By proceeding with the
+terms of each downloaded/installed package/tool/media listed below. By proceeding with the
 installation, you are accepting the license terms of each package, and
 acknowledging that your use of each package will be subject to its respective
 license terms.
 
+#### Github Repos
 [osslsigncode](https://github.com/develar/osslsigncode),
 [PyExifTool](https://github.com/sylikc/pyexiftool),
 [Exiftool package](https://exiftool.org/#license),
@@ -35,6 +36,13 @@ license terms.
 [ReversingLabs Yara rules](https://github.com/reversinglabs/reversinglabs-yara-rules),
 [Samir Yara rules](https://github.com/sbousseaden/YaraHunts),
 [InQuest Yara rules](https://github.com/InQuest/yara-rules),
+[dr4k0nia Yara rules](https://github.com/dr4k0nia/yara-rules),
+[Facebook Yara rules](https://github.com/facebook/malware-detection),
+[JPCERTCC Yara rules](https://github.com/JPCERTCC/jpcert-yara),
+[HuntressLab Yara rules](https://github.com/embee-research/Yara),
+[elceef Yara Rules](https://github.com/elceef/yara-rulz),
+[Elastic Yara Rules](https://github.com/elastic/protections-artifacts), 
+[SIFalcon Yara Rules](https://github.com/SIFalcon/Detection/),
 [APKiD](https://github.com/rednaga/APKiD/blob/master/LICENSE.COMMERCIAL),
 [Box-JS](https://github.com/CapacitorSet/box-js/blob/master/LICENSE),
 [Capa](https://github.com/fireeye/capa/blob/master/LICENSE.txt),
@@ -42,9 +50,7 @@ license terms.
 [IntelX](https://intelx.io/terms-of-service),
 [Speakeasy](https://github.com/fireeye/speakeasy),
 [Checkdmarc](https://github.com/domainaware/checkdmarc),
-[Manalyze](https://github.com/JusticeRage/Manalyze),
 [Qiling](https://github.com/qilingframework/qiling),
-[Renderton](https://github.com/GoogleChrome/rendertron/blob/main/LICENSE)
 [PyCTI](https://github.com/OpenCTI-Platform/client-python/blob/master/LICENSE),
 [PyHashlookup](https://github.com/CIRCL/PyHashlookup),
 [PyPDNS](https://github.com/CIRCL/PyPDNS),
@@ -52,4 +58,21 @@ license terms.
 [CyberChef-server](https://github.com/gchq/CyberChef-server/blob/master/LICENSE),
 [pyelftools](https://github.com/eliben/pyelftools),
 [telfhash](https://github.com/trendmicro/telfhash),
-[Authlib](https://github.com/lepture/authlib)
+[Authlib](https://github.com/lepture/authlib),
+[Fangfrisch](https://github.com/rseichter/fangfrisch),
+[pyOneNote](https://github.com/DissectMalware/pyOneNote)
+
+#### Media
+[notification.mp3](https://notificationsounds.com/message-tones/relax-message-tone),
+[country flags](https://www.npmjs.com/package/flag-icons),
+[VT,OTX,Github and Twitter icons](https://react-icons.github.io/react-icons/),
+[Hybrid Analysis flag](https://github.com/PayloadSecurity),
+[Google icon](https://www.google.com),
+[Cloudflare icon](https://www.cloudflare.com/),
+[Quad9 icon](https://icon-icons.com/pt/icone/quad9-logo/170815),
+[URLhaus icon](https://urlhaus.abuse.ch/favicon.ico),
+
+
+
+
+

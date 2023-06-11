@@ -1,6 +1,10 @@
 # This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
 # See the file 'LICENSE' for copying permission.
 
+# CARE! There is a python apkid package but that conflicts
+# with currently installed yara-python version
+# Because of this, it is better to handle this separately with his own environment
+
 from api_app.analyzers_manager.classes import DockerBasedAnalyzer, FileAnalyzer
 
 
@@ -30,4 +34,9 @@ class APKiD(FileAnalyzer, DockerBasedAnalyzer):
         }
         req_files = {fname: binary}
 
-        return self._docker_run(req_data, req_files)
+        report = self._docker_run(req_data, req_files, analyzer_name=self.analyzer_name)
+        if not report:
+            # APKiD provides empty result in case it does not support the binary type
+            self.report.errors.append("APKiD does not support the file")
+            return {}
+        return report

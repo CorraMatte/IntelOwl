@@ -1,6 +1,6 @@
 # This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
 # See the file 'LICENSE' for copying permission.
-
+import abc
 import base64
 import logging
 import time
@@ -9,32 +9,31 @@ from datetime import datetime, timedelta
 import requests
 
 from api_app.analyzers_manager.classes import BaseAnalyzerMixin
-from api_app.exceptions import AnalyzerRunException
+from api_app.analyzers_manager.exceptions import AnalyzerRunException
 
 logger = logging.getLogger(__name__)
 
 
-class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
+class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin, metaclass=abc.ABCMeta):
     base_url = "https://www.virustotal.com/api/v3/"
 
-    def set_params(self, params):
-        # CARE!!!! VT is normally used with paid quotas!!!
-        # Do not change these values without knowing what you are doing!
-        self.max_tries = params.get("max_tries", 10)
-        self.poll_distance = params.get("poll_distance", 30)
-        self.include_behaviour_summary = params.get("include_behaviour_summary", False)
-        self.include_sigma_analyses = params.get("include_sigma_analyses", False)
-        self.force_active_scan = params.get("force_active_scan", False)
-        self.force_active_scan_if_old = params.get("force_active_scan_if_old", False)
-        self.days_to_say_that_a_scan_is_old = params.get(
-            "days_to_say_that_a_scan_is_old", 30
-        )
-        self.relationships_to_request = params.get("relationships_to_request", [])
-        self.relationships_elements = params.get("relationships_elements", 1)
+    max_tries: int
+    poll_distance: int
+    rescan_max_tries: int
+    rescan_poll_distance: int
+    include_behaviour_summary: bool
+    include_sigma_analyses: bool
+    force_active_scan: bool = False
+    force_active_scan_if_old: bool
+    days_to_say_that_a_scan_is_old: int
+    relationships_to_request: list
+    relationships_elements: int
+    url_sub_path: str
+    _api_key_name: str
 
     @property
     def headers(self) -> dict:
-        return {"x-apikey": self._secrets["api_key_name"]}
+        return {"x-apikey": self._api_key_name}
 
     def _get_relationship_limit(self, relationship):
         # by default, just extract the first element
@@ -149,12 +148,13 @@ class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
                             )
                             # the "rescan" option will burn quotas.
                             # We should reduce the polling at the minimum
-                            result = self._vt_scan_file(
-                                observable_name,
-                                rescan_instead=True,
-                                max_tries=2,
-                                poll_distance=120,
+                            extracted_result = self._vt_scan_file(
+                                observable_name, rescan_instead=True
                             )
+                            # if we were able to do a successful rescan,
+                            # overwrite old report
+                            if extracted_result:
+                                result = extracted_result
                             already_done_active_scan_because_report_was_old = True
                         else:
                             logger.info(
@@ -226,21 +226,17 @@ class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
                 observable_name, relationships_requested, uri, result
             )
 
+        result["link"] = f"https://www.virustotal.com/gui/{obs_clfn}/{observable_name}"
+
         return result
 
-    def _vt_scan_file(
-        self, md5: str, rescan_instead: bool = False, max_tries=None, poll_distance=None
-    ) -> dict:
-        # This can be overwritten to allow different configurations
-        # Do not change this if you do not know what you are doing.
-        # This impacts paid quota usage
-        max_tries = max_tries if max_tries else self.max_tries
-        poll_distance = poll_distance if poll_distance else self.poll_distance
-
+    def _vt_scan_file(self, md5: str, rescan_instead: bool = False) -> dict:
         if rescan_instead:
             logger.info(f"(Job: {self.job_id}, {md5}) -> VT analyzer requested rescan")
             files = {}
             uri = f"files/{md5}/analyse"
+            poll_distance = self.rescan_poll_distance
+            max_tries = self.rescan_max_tries
         else:
             logger.info(f"(Job: {self.job_id}, {md5}) -> VT analyzer requested scan")
             try:
@@ -252,6 +248,8 @@ class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
                 )
             files = {"file": binary}
             uri = "files"
+            poll_distance = self.poll_distance
+            max_tries = self.max_tries
 
         result, _ = self._perform_post_request(uri, files=files)
 
@@ -265,12 +263,13 @@ class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
         # max 5 minutes waiting
         got_result = False
         uri = f"analyses/{scan_id}"
+        logger.info(
+            "Starting POLLING for Scan results. "
+            f"Poll Distance {poll_distance}, tries {max_tries}, ScanID {scan_id}"
+            f" (Job: {self.job_id}, {md5})"
+        )
         for chance in range(max_tries):
             time.sleep(poll_distance)
-            logger.info(
-                f"Started POLLING for Scan results. ScanID {scan_id}"
-                f" (Job: {self.job_id}, {md5})"
-            )
             result, _ = self._perform_get_request(uri, files=files)
             analysis_status = (
                 result.get("data", {}).get("attributes", {}).get("status", "")
@@ -284,15 +283,23 @@ class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
                 got_result = True
                 break
 
-        if not got_result and not rescan_instead:
-            raise AnalyzerRunException(
+        result = {}
+        if got_result:
+            # retrieve the FULL report, not only scans results.
+            # If it's a new sample, it's free of charge.
+            result = self._vt_get_report(self.ObservableTypes.HASH, md5)
+        else:
+            message = (
                 f"[POLLING] (Job: {self.job_id}, {md5}) -> "
                 f"max polls tried, no result"
             )
+            # if we tried a rescan, we can still use the old report
+            if rescan_instead:
+                logger.info(message)
+            else:
+                raise AnalyzerRunException(message)
 
-        # retrieve the FULL report, not only scans results.
-        # If it's a new sample, it's free of charge.
-        return self._vt_get_report(self.ObservableTypes.HASH, md5)
+        return result
 
     def _perform_get_request(self, uri: str, ignore_404=False, **kwargs):
         return self._perform_request(uri, method="GET", ignore_404=ignore_404, **kwargs)
@@ -389,24 +396,23 @@ class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
             )
         return relationships
 
-    @classmethod
-    def _get_requests_params_and_uri(cls, obs_clfn: str, observable_name: str):
+    def _get_requests_params_and_uri(self, obs_clfn: str, observable_name: str):
         params = {}
         # in this way, you just retrieved metadata about relationships
         # if you like to get all the data about specific relationships,...
         # ..you should perform another query
         # check vt3 API docs for further info
-        relationships_requested = cls._get_relationship_for_classification(obs_clfn)
-        if obs_clfn == cls.ObservableTypes.DOMAIN:
+        relationships_requested = self._get_relationship_for_classification(obs_clfn)
+        if obs_clfn == self.ObservableTypes.DOMAIN:
             uri = f"domains/{observable_name}"
-        elif obs_clfn == cls.ObservableTypes.IP:
+        elif obs_clfn == self.ObservableTypes.IP:
             uri = f"ip_addresses/{observable_name}"
-        elif obs_clfn == cls.ObservableTypes.URL:
+        elif obs_clfn == self.ObservableTypes.URL:
             url_id = (
                 base64.urlsafe_b64encode(observable_name.encode()).decode().strip("=")
             )
             uri = f"urls/{url_id}"
-        elif obs_clfn == cls.ObservableTypes.HASH:
+        elif obs_clfn == self.ObservableTypes.HASH:
             uri = f"files/{observable_name}"
         else:
             raise AnalyzerRunException(
@@ -419,5 +425,8 @@ class VirusTotalv3AnalyzerMixin(BaseAnalyzerMixin):
             # it just helps to understand if there is something to look for there
             # so, if there is, we can make API requests without wasting quotas
             params["relationships"] = ",".join(relationships_requested)
-
+        if self.url_sub_path:
+            if not self.url_sub_path.startswith("/"):
+                uri += "/"
+            uri += self.url_sub_path
         return params, uri, relationships_requested

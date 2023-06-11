@@ -1,3 +1,6 @@
+# This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
+# See the file 'LICENSE' for copying permission.
+
 from intel_owl import secrets
 
 from .commons import DEBUG
@@ -18,65 +21,82 @@ LOGGING = {
     "handlers": {
         "api_app": {
             "level": INFO_OR_DEBUG_LEVEL,
-            "class": "logging.handlers.RotatingFileHandler",
+            # we use Logrotate instead of RotatingFileHandler because more reliable
+            "class": "logging.handlers.WatchedFileHandler",
             "filename": f"{DJANGO_LOG_DIRECTORY}/api_app.log",
             "formatter": "stdfmt",
-            "maxBytes": 20 * 1024 * 1024,
-            "backupCount": 6,
         },
         "api_app_error": {
             "level": "ERROR",
-            "class": "logging.handlers.RotatingFileHandler",
+            "class": "logging.handlers.WatchedFileHandler",
             "filename": f"{DJANGO_LOG_DIRECTORY}/api_app_errors.log",
             "formatter": "stdfmt",
-            "maxBytes": 20 * 1024 * 1024,
-            "backupCount": 6,
         },
         "celery": {
             "level": INFO_OR_DEBUG_LEVEL,
-            "class": "logging.handlers.RotatingFileHandler",
+            "class": "logging.handlers.WatchedFileHandler",
             "filename": f"{DJANGO_LOG_DIRECTORY}/celery.log",
             "formatter": "stdfmt",
-            "maxBytes": 20 * 1024 * 1024,
-            "backupCount": 6,
         },
         "celery_error": {
             "level": "ERROR",
-            "class": "logging.handlers.RotatingFileHandler",
+            "class": "logging.handlers.WatchedFileHandler",
             "filename": f"{DJANGO_LOG_DIRECTORY}/celery_errors.log",
             "formatter": "stdfmt",
-            "maxBytes": 20 * 1024 * 1024,
-            "backupCount": 6,
         },
         "django_auth_ldap": {
             "level": INFO_OR_DEBUG_LEVEL,
-            "class": "logging.handlers.RotatingFileHandler",
+            "class": "logging.handlers.WatchedFileHandler",
             "filename": f"{DJANGO_LOG_DIRECTORY}/django_auth_ldap.log",
             "formatter": "stdfmt",
-            "maxBytes": 20 * 1024 * 1024,
-            "backupCount": 6,
         },
         # 500 errors are handled by this in the same log file of the others API errors
         "django_unhandled_errors": {
             "level": "ERROR",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": f"{DJANGO_LOG_DIRECTORY}/api_app_errors.log",
+            "class": "logging.handlers.WatchedFileHandler",
+            "filename": f"{DJANGO_LOG_DIRECTORY}/django_errors.log",
             "formatter": "stdfmt",
-            "maxBytes": 20 * 1024 * 1024,
-            "backupCount": 6,
         },
         "certego_saas": {
             "level": INFO_OR_DEBUG_LEVEL,
+            "class": "logging.handlers.WatchedFileHandler",
+            "filename": f"{DJANGO_LOG_DIRECTORY}/certego_saas.log",
+            "formatter": "stdfmt",
+        },
+        "certego_saas_errors": {
+            "level": "ERROR",
+            "class": "logging.handlers.WatchedFileHandler",
+            "filename": f"{DJANGO_LOG_DIRECTORY}/certego_saas_errors.log",
+            "formatter": "stdfmt",
+        },
+        "rest_email_auth": {
+            "level": INFO_OR_DEBUG_LEVEL,
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": f"{DJANGO_LOG_DIRECTORY}/api_app.log",
+            "filename": f"{DJANGO_LOG_DIRECTORY}/authentication.log",
             "formatter": "stdfmt",
             "maxBytes": 20 * 1024 * 1024,
             "backupCount": 6,
         },
-        "certego_saas_errors": {
+        "rest_email_auth_errors": {
             "level": "ERROR",
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": f"{DJANGO_LOG_DIRECTORY}/api_app_errors.log",
+            "filename": f"{DJANGO_LOG_DIRECTORY}/authentication_errors.log",
+            "formatter": "stdfmt",
+            "maxBytes": 20 * 1024 * 1024,
+            "backupCount": 6,
+        },
+        "authentication": {
+            "level": INFO_OR_DEBUG_LEVEL,
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": f"{DJANGO_LOG_DIRECTORY}/authentication.log",
+            "formatter": "stdfmt",
+            "maxBytes": 20 * 1024 * 1024,
+            "backupCount": 6,
+        },
+        "authentication_errors": {
+            "level": "ERROR",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": f"{DJANGO_LOG_DIRECTORY}/authentication_errors.log",
             "formatter": "stdfmt",
             "maxBytes": 20 * 1024 * 1024,
             "backupCount": 6,
@@ -85,6 +105,11 @@ LOGGING = {
     "loggers": {
         "api_app": {
             "handlers": ["api_app", "api_app_error"],
+            "level": INFO_OR_DEBUG_LEVEL,
+            "propagate": True,
+        },
+        "authentication": {
+            "handlers": ["authentication", "authentication_errors"],
             "level": INFO_OR_DEBUG_LEVEL,
             "propagate": True,
         },
@@ -105,6 +130,11 @@ LOGGING = {
         },
         "certego_saas": {
             "handlers": ["certego_saas", "certego_saas_errors"],
+            "level": INFO_OR_DEBUG_LEVEL,
+            "propagate": True,
+        },
+        "rest_email_auth": {
+            "handlers": ["rest_email_auth", "rest_email_auth_errors"],
             "level": INFO_OR_DEBUG_LEVEL,
             "propagate": True,
         },

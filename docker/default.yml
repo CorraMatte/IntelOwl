@@ -5,22 +5,15 @@ x-no-healthcheck: &no-healthcheck
     disable: true
 
 services:
-  postgres:
-    image: library/postgres:12-alpine
-    container_name: intelowl_postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    env_file:
-      - ./env_file_postgres
-
   uwsgi:
-    image: intelowlproject/intelowl:${INTELOWL_TAG_VERSION}
+    image: intelowlproject/intelowl:${REACT_APP_INTELOWL_VERSION}
     container_name: intelowl_uwsgi
     volumes:
       - ../configuration/intel_owl.ini:/etc/uwsgi/sites/intel_owl.ini # uwsgi configuration file
       - ../configuration:/opt/deploy/intel_owl/configuration
       - ../custom_ruleset:/opt/deploy/yara/custom_ruleset
       - generic_logs:/var/log/intel_owl
+      - ../frontend/public/env.js:/var/www/reactapp/env.js # this is needed because we have to mount the file from the server to the image BEFORE staticfiles
       - static_content:/opt/deploy/intel_owl/static
       - shared_files:/opt/deploy/files_required
     entrypoint:
@@ -30,11 +23,9 @@ services:
     env_file:
       - env_file_app
       - .env
-    depends_on:
-      - postgres
 
   nginx:
-    image: intelowlproject/intelowl_nginx:${INTELOWL_TAG_VERSION}
+    image: intelowlproject/intelowl_nginx:${REACT_APP_INTELOWL_VERSION}
     container_name: intelowl_nginx
     restart: unless-stopped
     hostname: nginx
@@ -49,16 +40,8 @@ services:
     depends_on:
       - uwsgi
 
-  rabbitmq:
-    image: library/rabbitmq:3.9-alpine
-    container_name: intelowl_rabbitmq
-    volumes:
-      - ../configuration/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
-    logging:
-      driver: none
-
   celery_beat:
-    image: intelowlproject/intelowl:${INTELOWL_TAG_VERSION}
+    image: intelowlproject/intelowl:${REACT_APP_INTELOWL_VERSION}
     container_name: intelowl_celery_beat
     restart: unless-stopped
     volumes:
@@ -71,14 +54,12 @@ services:
     env_file:
       - env_file_app
     depends_on:
-      - rabbitmq
-      - postgres
       - uwsgi
     <<: *no-healthcheck
 
 
   celery_worker_default:
-    image: intelowlproject/intelowl:${INTELOWL_TAG_VERSION}
+    image: intelowlproject/intelowl:${REACT_APP_INTELOWL_VERSION}
     container_name: intelowl_celery_worker_default
     restart: unless-stopped
     stop_grace_period: 3m
@@ -97,8 +78,6 @@ services:
     env_file:
       - env_file_app
     depends_on:
-      - rabbitmq
-      - postgres
       - uwsgi
     <<: *no-healthcheck
 

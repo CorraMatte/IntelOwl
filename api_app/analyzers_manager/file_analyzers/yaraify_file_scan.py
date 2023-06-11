@@ -8,24 +8,37 @@ import time
 import requests
 
 from api_app.analyzers_manager.classes import FileAnalyzer
+from api_app.analyzers_manager.exceptions import (
+    AnalyzerConfigurationException,
+    AnalyzerRunException,
+)
 from api_app.analyzers_manager.observable_analyzers.yaraify import YARAify
-from tests.mock_utils import MockResponse, if_mock_connections, patch
+from tests.mock_utils import MockUpResponse, if_mock_connections, patch
 
 logger = logging.getLogger(__name__)
 
 
 class YARAifyFileScan(FileAnalyzer, YARAify):
-    def set_params(self, params):
-        YARAify.set_params(self, params)
-        self.search_term = self.md5
-        self.__api_key_identifier = self._secrets["api_key_identifier"]
 
-        self.clamav_scan: int = params.get("clamav_scan", 1)
-        self.unpack: int = params.get("unpack", 0)
-        self.share_file: int = params.get("share_file", 0)
+    _api_key_identifier: str
+    send_file: bool
+    clamav_scan: bool
+    unpack: bool
+    share_file: bool
+    skip_noisy: bool
+    skip_known: bool
+
+    def config(self):
+        self.query = "lookup_hash"
+        YARAify.config(self)
+        self.search_term = self.md5
 
         self.max_tries = 200
         self.poll_distance = 3
+        if self.send_file and not hasattr(self, "_api_key_identifier"):
+            raise AnalyzerConfigurationException(
+                "Unable to send file without having api_key_identifier set"
+            )
 
     def run(self):
         name_to_send = self.filename if self.filename else self.md5
@@ -35,31 +48,66 @@ class YARAifyFileScan(FileAnalyzer, YARAify):
         query_status = hash_scan.get("query_status")
 
         if query_status == "ok":
+            logger.info(f"found YARAify hash scan and returning it. {self.md5}")
+            hash_scan["hash_check_found"] = True
             return hash_scan
 
-        data = {
-            "clamav_scan": self.clamav_scan,
-            "unpack": self.unpack,
-            "share_file": self.share_file,
-            "identifier": self.__api_key_identifier,
-        }
+        result = hash_scan
+        if self.send_file:
+            data = {
+                "identifier": self._api_key_identifier,
+                # the server wants either 0 or 1
+                # https://yaraify.abuse.ch/api/#file-scan
+                "clamav_scan": int(self.clamav_scan),
+                "unpack": int(self.unpack),
+                "share_file": int(self.share_file),
+                "skip_noisy": int(self.skip_noisy),
+                "skip_known": int(self.skip_known),
+            }
 
-        files_ = {
-            "json_data": (None, json.dumps(data), "application/json"),
-            "file": (name_to_send, file),
-        }
-
-        logger.info(f"yara file scan md5 {self.md5} sending sample for analysis")
-        for _try in range(self.max_tries):
-            logger.info(
-                f"yara file scan md5 {self.md5} polling for result try #{_try + 1}"
-            )
+            files_ = {
+                "json_data": (None, json.dumps(data), "application/json"),
+                "file": (name_to_send, file),
+            }
+            logger.info(f"yara file scan md5 {self.md5} sending sample for analysis")
             response = requests.post(self.url, files=files_)
-            if response.status_code == 200:
-                break
-            time.sleep(self.poll_distance)
+            response.raise_for_status()
+            scan_response = response.json()
+            scan_query_status = scan_response.get("query_status")
+            if scan_query_status == "queued":
+                task_id = scan_response.get("data", {}).get("task_id", "")
+                if not task_id:
+                    raise AnalyzerRunException(
+                        f"task_id value is unexpected: {task_id}."
+                        f"Analysis was requested for md5 {self.md5}"
+                    )
+                for _try in range(self.max_tries):
+                    try:
+                        logger.info(
+                            f"yara file scan md5 {self.md5} polling for"
+                            f" result try #{_try + 1}."
+                            f"task_id: {task_id}"
+                        )
+                        data = {"query": "get_results", "task_id": task_id}
+                        response = requests.post(self.url, json=data)
+                        response.raise_for_status()
+                        task_response = response.json()
+                        logger.debug(task_response)
+                        data_results = task_response.get("data")
+                        if isinstance(data_results, dict) and data_results:
+                            logger.info(f"found scan result for {self.md5}")
+                            break
+                    except requests.RequestException as e:
+                        logger.warning(e, stack_info=True)
+                    time.sleep(self.poll_distance)
+            else:
+                raise AnalyzerRunException(
+                    f"query_status value is unexpected: {scan_query_status}."
+                    f"Analysis was requested for md5 {self.md5}"
+                )
 
-        result = response.json()
+            result = response.json()
+
         return result
 
     @classmethod
@@ -68,7 +116,15 @@ class YARAifyFileScan(FileAnalyzer, YARAify):
             if_mock_connections(
                 patch(
                     "requests.post",
-                    return_value=MockResponse({}, 200),
+                    side_effect=[
+                        MockUpResponse({"query_status": "not-available"}, 200),
+                        MockUpResponse(
+                            {"query_status": "queued", "data": {"task_id": 123}}, 200
+                        ),
+                        MockUpResponse(
+                            {"query_status": "ok", "data": {"static_results": []}}, 200
+                        ),
+                    ],
                 )
             )
         ]

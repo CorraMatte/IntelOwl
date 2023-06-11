@@ -8,8 +8,8 @@ import requests
 from django.conf import settings
 
 from api_app.analyzers_manager import classes
-from api_app.exceptions import AnalyzerRunException
-from tests.mock_utils import MockResponse, if_mock_connections, patch
+from api_app.analyzers_manager.exceptions import AnalyzerRunException
+from tests.mock_utils import MockUpResponse, if_mock_connections, patch
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +21,14 @@ class Talos(classes.ObservableAnalyzer):
     def run(self):
         result = {"found": False}
         if not os.path.isfile(database_location):
-            self.updater()
+            self._update()
 
         if not os.path.exists(database_location):
             raise AnalyzerRunException(
                 f"database location {database_location} does not exist"
             )
 
-        with open(database_location, "r") as f:
+        with open(database_location, "r", encoding="utf-8") as f:
             db = f.read()
 
         db_list = db.split("\n")
@@ -38,17 +38,14 @@ class Talos(classes.ObservableAnalyzer):
         return result
 
     @classmethod
-    def updater(cls):
-        if not cls.enabled:
-            logger.warning("No running updater for Talos, because it is disabled")
-            return
+    def _update(cls):
         try:
             logger.info("starting download of db from talos")
             url = "https://snort.org/downloads/ip-block-list"
             r = requests.get(url)
             r.raise_for_status()
 
-            with open(database_location, "w") as f:
+            with open(database_location, "w", encoding="utf-8") as f:
                 f.write(r.content.decode())
 
             if not os.path.exists(database_location):
@@ -67,7 +64,7 @@ class Talos(classes.ObservableAnalyzer):
             if_mock_connections(
                 patch(
                     "requests.get",
-                    return_value=MockResponse({}, 200, content=b"91.192.100.61"),
+                    return_value=MockUpResponse({}, 200, content=b"91.192.100.61"),
                 ),
             )
         ]

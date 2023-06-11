@@ -8,8 +8,8 @@ from typing import Dict
 import requests
 
 from api_app.analyzers_manager.classes import FileAnalyzer
-from api_app.exceptions import AnalyzerRunException
-from tests.mock_utils import MockResponse, if_mock_connections, patch
+from api_app.analyzers_manager.exceptions import AnalyzerRunException
+from tests.mock_utils import MockUpResponse, if_mock_connections, patch
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +17,22 @@ logger = logging.getLogger(__name__)
 class UnpacMe(FileAnalyzer):
     base_url: str = "https://api.unpac.me/api/v1/"
 
-    def set_params(self, params):
-        private = params.get("private", False)
-        self.private = "private" if private else "public"
-        self.__api_key = self._secrets["api_key_name"]
-        # max no. of tries when polling for result
-        self.max_tries = params.get("max_tries", 30)
+    _api_key_name: str
+    private: bool
+    # max no. of tries when polling for result
+    max_tries: int
+
+    def config(self):
+        super().config()
+        self.private: str = "private" if self.private else "public"
+
+        self.headers = {"Authorization": f"Key {self._api_key_name}"}
+
         # interval b/w HTTP requests when polling
         self.poll_distance = 5
 
     def run(self):
-        self.headers = {"Authorization": "Key %s" % self.__api_key}
+        report = {}
         unpac_id = self._upload()
         logger.info(f"md5 {self.md5} job {self.job_id} uploaded id {unpac_id}")
         for chance in range(self.max_tries):
@@ -37,15 +42,20 @@ class UnpacMe(FileAnalyzer):
                 f" job_id {self.job_id}. starting the query"
             )
             status = self._get_status(unpac_id)
+            logger.info(
+                f"md5 {self.md5} job {self.job_id} id {unpac_id} status {status}"
+            )
             if status == "fail":
-                logger.error(f"md5 {self.md5} job {self.job_id} analysis has failed")
-                raise AnalyzerRunException("failed analysis")
-            if status != "complete":
-                logger.info(
-                    f"md5 {self.md5} job {self.job_id} id {unpac_id} status {status}"
+                raise AnalyzerRunException(
+                    f"failed analysis for {self.md5} job {self.job_id}"
                 )
+            if status == "complete":
+                report = self._get_report(unpac_id)
+                break
+            else:
                 continue
-            return self._get_report(unpac_id)
+
+        return report
 
     def _req_with_checks(self, url, files=None, post=False):
         try:
@@ -106,13 +116,13 @@ class UnpacMe(FileAnalyzer):
             if_mock_connections(
                 patch(
                     "requests.get",
-                    return_value=MockResponse(
+                    return_value=MockUpResponse(
                         {"id": "test", "status": "complete"}, 200
                     ),
                 ),
                 patch(
                     "requests.post",
-                    return_value=MockResponse({"id": "test"}, 200),
+                    return_value=MockUpResponse({"id": "test"}, 200),
                 ),
             )
         ]

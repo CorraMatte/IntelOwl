@@ -8,6 +8,7 @@ import { addToast, confirm } from "@certego/certego-ui";
 import { API_BASE_URI, JOB_BASE_URI } from "../../../constants/api";
 
 // constants
+
 const areYouSureConfirmDialog = (opName) =>
   confirm({
     title: (
@@ -90,13 +91,10 @@ export async function saveJobAsPlaybook(values) {
   const data = {
     name: values.name,
     description: values.description,
-    job_id: values.jobId,
+    job: values.jobId,
   };
   try {
-    const response = await axios.post(
-      `${API_BASE_URI}/playbook/cache_playbook`,
-      data
-    );
+    const response = await axios.post(`${API_BASE_URI}/playbook`, data);
 
     success = response.status === 200;
     if (success) {
@@ -120,21 +118,21 @@ export async function saveJobAsPlaybook(values) {
   return success;
 }
 
-export async function killPlugin(jobId, pluginType, pluginName) {
+export async function killPlugin(jobId, plugin) {
   const sure = await areYouSureConfirmDialog(
-    `kill ${pluginType} '${pluginName}'`
+    `kill ${plugin.type} '${plugin.name}'`
   );
   if (!sure) return Promise.reject();
   let success = false;
   try {
     const response = await axios.patch(
-      `${JOB_BASE_URI}/${jobId}/${pluginType}/${pluginName}/kill`
+      `${JOB_BASE_URI}/${jobId}/${plugin.type}/${plugin.id}/kill`
     );
     success = response.status === 204;
     if (success) {
       addToast(
         <span>
-          Kill request sent for {pluginType} <em>{pluginName}</em>
+          Kill request sent for {plugin.type} <em>{plugin.name}</em>
         </span>,
         null,
         "info"
@@ -143,7 +141,7 @@ export async function killPlugin(jobId, pluginType, pluginName) {
   } catch (e) {
     addToast(
       <span>
-        Failed. Operation: kill {pluginType} <em>{pluginName}</em>
+        Failed. Operation: kill {plugin.type} <em>{plugin.name}</em>
       </span>,
       e.parsedMsg,
       "warning"
@@ -152,21 +150,21 @@ export async function killPlugin(jobId, pluginType, pluginName) {
   return success;
 }
 
-export async function retryPlugin(jobId, pluginType, pluginName) {
+export async function retryPlugin(jobId, plugin) {
   const sure = await areYouSureConfirmDialog(
-    `retry ${pluginType} '${pluginName}'`
+    `retry ${plugin.type} '${plugin.name}'`
   );
   if (!sure) return Promise.reject();
   let success = false;
   try {
     const response = await axios.patch(
-      `${JOB_BASE_URI}/${jobId}/${pluginType}/${pluginName}/retry`
+      `${JOB_BASE_URI}/${jobId}/${plugin.type}/${plugin.id}/retry`
     );
     success = response.status === 204;
     if (success) {
       addToast(
         <span>
-          Retry request sent for {pluginType} <em>{pluginName}</em>
+          Retry request sent for {plugin.type} <em>{plugin.name}</em>
         </span>,
         null,
         "info"
@@ -175,7 +173,7 @@ export async function retryPlugin(jobId, pluginType, pluginName) {
   } catch (e) {
     addToast(
       <span>
-        Failed. Operation: retry {pluginType} <em>{pluginName}</em>
+        Failed. Operation: retry {plugin.type} <em>{plugin.name}</em>
       </span>,
       e.parsedMsg,
       "warning"

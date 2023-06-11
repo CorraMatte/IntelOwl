@@ -21,13 +21,20 @@ INTELOWL_MISP_TYPE_MAP = {
 }
 
 
+def create_misp_attribute(misp_type, misp_value) -> pymisp.MISPAttribute:
+    obj = pymisp.MISPAttribute()
+    obj.type = misp_type
+    obj.value = misp_value
+    return obj
+
+
 class MISP(Connector):
-    def set_params(self, params):
-        self.ssl_check = params.get("ssl_check", True)
-        self.debug = params.get("debug", False)
-        self.tlp = params.get("tlp", "white")
-        self.__url_name = self._secrets["url_key_name"]
-        self.__api_key = self._secrets["api_key_name"]
+    tlp: str
+    ssl_check: bool
+    self_signed_certificate: str
+    debug: bool
+    _api_key_name: str
+    _url_key_name: str
 
     @property
     def _event_obj(self) -> pymisp.MISPEvent:
@@ -45,12 +52,6 @@ class MISP(Connector):
 
         return obj
 
-    def _get_attr_obj(self, type, value) -> pymisp.MISPAttribute:
-        obj = pymisp.MISPAttribute()
-        obj.type = type
-        obj.value = value
-        return obj
-
     @property
     def _base_attr_obj(self) -> pymisp.MISPAttribute:
         if self._job.is_sample:
@@ -66,8 +67,11 @@ class MISP(Connector):
             else:
                 _type = INTELOWL_MISP_TYPE_MAP[_type]
 
-        obj = self._get_attr_obj(_type, value)
-        obj.comment = f"Analyzers Executed: {', '.join(self._job.analyzers_to_execute)}"
+        obj = create_misp_attribute(_type, value)
+        analyzers_names = self._job.analyzers_to_execute.all().values_list(
+            "name", flat=True
+        )
+        obj.comment = "Analyzers Executed:" f" {', '.join(analyzers_names)}"
         return obj
 
     @property
@@ -75,7 +79,7 @@ class MISP(Connector):
         obj_list = []
         if self._job.is_sample:
             # mime-type
-            obj_list.append(self._get_attr_obj("mime-type", self._job.file_mimetype))
+            obj_list.append(create_misp_attribute("mime-type", self._job.file_mimetype))
         return obj_list
 
     @property
@@ -92,10 +96,15 @@ class MISP(Connector):
         return obj
 
     def run(self):
+        ssl_param = (
+            f"{settings.PROJECT_LOCATION}/configuration/misp_ssl.crt"
+            if self.ssl_check and self.self_signed_certificate
+            else self.ssl_check
+        )
         misp_instance = pymisp.PyMISP(
-            url=self.__url_name,
-            key=self.__api_key,
-            ssl=self.ssl_check,
+            url=self._url_key_name,
+            key=self._api_key_name,
+            ssl=ssl_param,
             debug=self.debug,
             timeout=5,
         )
@@ -133,7 +142,7 @@ class MISP(Connector):
 
 
 # Mocks
-class MockMISPElement:
+class MockUpMISPElement:
     """
     Mock element(event/attribute) for testing
     """
@@ -150,11 +159,14 @@ class MockPyMISP:
     def __init__(self, *args, **kwargs) -> None:
         pass
 
-    def add_event(self, *args, **kwargs) -> MockMISPElement:
-        return MockMISPElement()
+    @staticmethod
+    def add_event(*args, **kwargs) -> MockUpMISPElement:
+        return MockUpMISPElement()
 
-    def add_attribute(self, *args, **kwargs) -> MockMISPElement:
-        return MockMISPElement()
+    @staticmethod
+    def add_attribute(*args, **kwargs) -> MockUpMISPElement:
+        return MockUpMISPElement()
 
-    def get_event(self, event_id) -> dict:
+    @staticmethod
+    def get_event(event_id) -> dict:
         return {"Event": {"id": event_id}}

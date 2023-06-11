@@ -7,41 +7,45 @@ from urllib.parse import urlparse
 import requests
 
 from api_app.analyzers_manager import classes
-from api_app.exceptions import AnalyzerRunException
-from tests.mock_utils import MockResponse, if_mock_connections, patch
+from api_app.analyzers_manager.exceptions import AnalyzerRunException
+from tests.mock_utils import MockUpResponse, if_mock_connections, patch
 
 
 class Robtex(classes.ObservableAnalyzer):
     base_url = "https://freeapi.robtex.com/"
 
-    def set_params(self, params):
-        self.analysis_type = params.get("robtex_analysis", "ip_query")
-
     def run(self):
-        if self.analysis_type == "ip_query":
-            uri = f"ipquery/{self.observable_name}"
-        elif self.analysis_type == "reverse_pdns":
-            uri = f"pdns/reverse/{self.observable_name}"
-        elif self.analysis_type == "forward_pdns":
-            domain = self.observable_name
+        if self.observable_classification == self.ObservableTypes.IP:
+            uris = [
+                f"ipquery/{self.observable_name}",
+                f"pdns/reverse/{self.observable_name}",
+            ]
+        elif self.observable_classification in [
+            self.ObservableTypes.URL,
+            self.ObservableTypes.DOMAIN,
+        ]:
             if self.observable_classification == self.ObservableTypes.URL:
                 domain = urlparse(self.observable_name).hostname
-            uri = f"pdns/forward/{domain}"
+            else:
+                domain = self.observable_name
+            uris = [f"pdns/forward/{domain}"]
         else:
             raise AnalyzerRunException(
-                f"not supported analysis type {self.analysis_type}."
+                f"not supported analysis type {self.observable_classification}."
             )
-        try:
-            response = requests.get(self.base_url + uri)
-            response.raise_for_status()
-            result = response.text.split("\r\n")
-        except requests.ConnectionError as e:
-            raise AnalyzerRunException(f"Connection error: {e}")
-        else:
-            loaded_results = []
-            for item in result:
-                if len(item) > 0:
-                    loaded_results.append(json.loads(item))
+
+        loaded_results = []
+        for uri in uris:
+            try:
+                response = requests.get(self.base_url + uri)
+                response.raise_for_status()
+                result = response.text.split("\r\n")
+            except requests.ConnectionError as e:
+                raise AnalyzerRunException(f"Connection error: {e}")
+            else:
+                for item in result:
+                    if len(item) > 0:
+                        loaded_results.append(json.loads(item))
 
         return loaded_results
 
@@ -51,7 +55,7 @@ class Robtex(classes.ObservableAnalyzer):
             if_mock_connections(
                 patch(
                     "requests.get",
-                    return_value=MockResponse(
+                    return_value=MockUpResponse(
                         {}, 200, text='{"test1":"test1"}\r\n{"test2":"test2"}'
                     ),
                 ),

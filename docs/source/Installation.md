@@ -35,9 +35,10 @@ cd docker/
 cp env_file_app_template env_file_app
 cp env_file_postgres_template env_file_postgres
 cp env_file_integrations_template env_file_integrations
+cd ..
+cp frontend/public/env_template.js frontend/public/env.js
 
 # verify installed dependencies
-cd ..
 ./initialize.sh
 
 # start the app
@@ -87,6 +88,8 @@ cp env_file_app_template env_file_app
 cp env_file_postgres_template env_file_postgres
 cp env_file_integrations_template env_file_integrations
 cd ..
+cp frontend/public/env_template.js frontend/public/env.js
+
 ./initialize.sh
 ```
 
@@ -94,78 +97,38 @@ cd ..
 In the `env_file_app`, configure different variables as explained below.
 
 **REQUIRED** variables to run the image:
-* `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`: PostgreSQL configuration (The DB credentals should match the ones in the `env_file_postgres`).
+* `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`: PostgreSQL configuration (The DB credentals should match the ones in the `env_file_postgres`). If you like, you can configure the connection to an external PostgreSQL instance in the same variables. Then, to avoid to run PostgreSQL locally, please run IntelOwl with the option `--use-external-database`.
 
 **Strongly recommended** variable to set:
 * `DJANGO_SECRET`: random 50 chars key, must be unique. If you do not provide one, Intel Owl will automatically set a new secret on every run.
 * `INTELOWL_WEB_CLIENT_DOMAIN` (example: `localhost`/`mywebsite.com`): the web domain of your instance, this is used for generating links to analysis results.
 
-**Optional configuration**:
-* `OLD_JOBS_RETENTION_DAYS`: Database retention for analysis results (default: 3 days). Change this if you want to keep your old analysis longer in the database.
+Optional configuration:
+* `OLD_JOBS_RETENTION_DAYS`: Database retention for analysis results (default: 14 days). Change this if you want to keep your old analysis longer in the database.
 
-### Deprecated environment configuration
-The following variables are related to the specific services integrated in IntelOwl.
-They are deprecated and will be removed in the future: the new way to configure plugin secrets is to use the `Plugin Secrets` page in the GUI.
-This change not only promotes a better user experience and overall security, but allows to configure these secrets at either user or org level instead of globally.
+#### Other optional configuration to enable specific services / features
 
-If you had previously specified any variables in the environment, IntelOwl will migrate those variables for you once you update the software to the v4.1.0 and restart the containers.
-(Under the hood IntelOwl runs `docker exec -ti intelowl_uwsgi python3 manage.py migrate_secrets`). Then you can remove those secrets from the env file.
+Configuration required to enable integration with Slack:
+* `SLACK_TOKEN`: Slack token of your Slack application that will be used to send/receive notifications
+* `DEFAULT_SLACK_CHANNEL`: ID of the Slack channel you want to post the message to
 
-```text
-**Optional** variables needed to enable specific analyzers:
-* `ABUSEIPDB_KEY`: AbuseIPDB API key
-* `AUTH0_KEY`: Auth0 API Key
-* `SECURITYTRAILS_KEY`: Securitytrails API Key
-* `SHODAN_KEY`: Shodan API key
-* `HUNTER_API_KEY`: Hunter.io API key
-* `GSF_KEY`: Google Safe Browsing API key
-* `OTX_KEY`: Alienvault OTX API key
-* `CIRCL_CREDENTIALS`: CIRCL PDNS credentials in the format: `user|pass`
-* `VT_KEY`: VirusTotal API key
-* `HA_KEY`: HybridAnalysis API key
-* `INTEZER_KEY`: Intezer API key
-* `INQUEST_API_KEY`: InQuest API key
-* `FIRST_MISP_API`: FIRST MISP API key
-* `FIRST_MISP_URL`: FIRST MISP URL
-* `MISP_KEY`: your own MISP instance key
-* `MISP_URL`: your own MISP instance URL
-* `DNSDB_KEY`: DNSDB API key
-* `CUCKOO_URL`: your cuckoo instance URL
-* `HONEYDB_API_ID` & `HONEYDB_API_KEY`: HoneyDB API credentials
-* `CENSYS_API_ID` & `CENSYS_API_SECRET`: Censys credentials
-* `ONYPHE_KEY`: Onyphe.io's API Key 
-* `GREYNOISE_API_KEY`: GreyNoise API ([docs](https://docs.greynoise.io))
-* `INTELX_API_KEY`: IntelligenceX API ([docs](https://intelx.io/product))
-* `UNPAC_ME_API_KEY`: UnpacMe API ([docs](https://api.unpac.me/))
-* `IPINFO_KEY`: ipinfo API key
-* `ZOOMEYE_KEY`: ZoomEye API Key([docs](https://www.zoomeye.org/doc))
-* `TRIAGE_KEY`: tria.ge API key([docs](https://tria.ge/docs/))
-* `WIGLE_KEY`: WiGLE API Key([docs](https://api.wigle.net/))
-* `XFORCE_KEY` & `XFORCE_PASSWORD`: IBM X-Force Exchange API ([docs](https://api.xforce.ibmcloud.com/doc/))
-* `MWDB_KEY`: API key for [MWDB](https://mwdb.cert.pl/)
-* `SSAPINET_KEY`: screenshotapi.net ([docs](https://screenshotapi.net/documentation))
-* `MALPEDIA_KEY`: MALPEDIA API KEY ([docs](https://malpedia.caad.fkie.fraunhofer.de/usage/api))
-* `OPENCTI_KEY`: your own OpenCTI instance key
-* `OPENCTI_URL`: your own OpenCTI instance URL
-* `YETI_KEY`: your own YETI instance key
-* `YETI_URL`: your own YETI instance URL
-* `SPYSE_API_KEY`: [Spyse](https://spyse.com/) API key. Register here: https://spyse.com/user/registration"
-* `DRAGONFLY_API_KEY`: Dragonfly API key. Register [here](https://dragonfly.certego.net/register?utm_source=intelowl).
-* `VIRUSHEE_API_KEY`: Virushee API key. ([docs](https://api.virushee.com/))
-* `STALKPHISH_KEY`: Stalkphish.io API key. [Register here](https://www.stalkphish.io/accounts/register/).
-* `GREEDYBEAR_API_KEY`: GreedyBear API key
-* `MALPEDIA_TOKEN`: your own Malpedia token
-* `YARAIFY_KEY`: YARAify identifier ([docs](https://yaraify.abuse.ch/api/#identifiers))
+Configuration required to enable Re-Captcha in the Login and the Registration Page:
+In the `docker/env_file_app`:
+* `RECAPTCHA_SECRET_KEY_IO_LOCAL`: your recaptcha secret key internal deployment
+* `RECAPTCHA_SECRET_KEY_IO_PUBLIC`: your recaptcha secret key for public deployment
+In the `frontend/public/env.js`:
+* `RECAPTCHA_SITEKEY`: Recaptcha Key for your site
 
-**Optional** variables needed to work with specific connectors:
-* `CONNECTOR_MISP_KEY`: your own MISP instance key to use with `MISP` connector
-* `CONNECTOR_MISP_URL`: your own MISP instance URL to use with `MISP` connector
-* `CONNECTOR_OPENCTI_KEY`: your own OpenCTI instance key to use with `OpenCTI` connector
-* `CONNECTOR_OPENCTI_URL`: your own OpenCTI instance URL to use with `OpenCTI` connector
-* `CONNECTOR_YETI_KEY`: your own YETI instance key to use with `YETI` connector
-* `CONNECTOR_YETI_URL`: your own YETI instance API URL to use with `YETI` connector
+Configuration required to have InteOwl sending Emails (registration requests, mail verification, password reset/change, etc)
+* `DEFAULT_FROM_EMAIL`: email address used for automated correspondence from the site manager (example: `noreply@mydomain.com`)
+* `DEFAULT_EMAIL`: email address used for correspondence with users (example: `info@mydomain.com`)
+* `EMAIL_HOST`: the host to use for sending email with SMTP
+* `EMAIL_HOST_USER`: username to use for the SMTP server defined in EMAIL_HOST
+* `EMAIL_HOST_PASSWORD`: password to use for the SMTP server defined in EMAIL_HOST. This setting is used in conjunction with EMAIL_HOST_USER when authenticating to the SMTP server.
+* `EMAIL_PORT`: port to use for the SMTP server defined in EMAIL_HOST.
+* `EMAIL_USE_TLS`: whether to use an explicit TLS (secure) connection when talking to the SMTP server, generally used on port 587. 
+* `EMAIL_USE_SSL`: whether to use an implicit TLS (secure) connection when talking to the SMTP server, generally used on port 465.
 
-```
 ### Database configuration (required)
 In the `env_file_postgres`, configure different variables as explained below.
 
@@ -175,6 +138,27 @@ In the `env_file_postgres`, configure different variables as explained below.
 * `POSTGRES_DB` (default: `intel_owl_db`)
 
 If you prefer to use an external PostgreSQL instance, you should just remove the relative image from the `docker/default.yml` file and provide the configuration to connect to your controlled instances.
+
+### Logrotate configuration (strongly recommended)
+If you want to have your logs rotated correctly, we suggest you to add the configuration for the system Logrotate.
+To do that you can leverage the `initialize.sh` script. Otherwise, if you have skipped that part, you can manually install logrotate by launching the following script:
+```commandline
+cd ./docker/scripts
+./install_logrotate.sh
+```
+
+We decided to do not leverage Django Rotation Configuration because it caused problematic concurrency issues, leading to logs that are not rotated correctly and to apps that do not log anymore.
+Logrotate configuration is more stable.
+
+### Crontab configuration (recommended for advanced deployments)
+We added few Crontab configurations that could be installed in the host machine at system level to solve some possible edge-case issues:
+* Memory leaks: Once a week it is suggested to do a full restart of the application to clean-up the memory used by the application. Practical experience suggest us to do that to solve some recurrent memory issues in Celery. This cron (`application_restart`) assumes that you have executed IntelOwl with the parameters `-all_analyzers`. If you didn't, feel free to change the cron as you wish.
+
+This configuration is optional but strongly recommended for people who want to have a production grade deployment. To install it you need to run the following script in each deployed server:
+```commandline
+cd ./docker/scripts
+./install_crontab.sh
+```
 
 ### Web server configuration (optional)
 Intel Owl provides basic configuration for:
@@ -197,7 +181,7 @@ There are 3 options to execute the web server:
 
     Then you should call the `start.py` script with the parameter `--https` to leverage the right Docker Compose file for HTTPS.
   
-    Plus, if you use [Flower](Advanced-Usage.html#queue-customization), you should change in the `docker/flower.override.yml` the `flower_http.conf` with `flower_https.conf`.
+    Plus, if you use [Flower](Advanced-Configuration.html#queue-customization), you should change in the `docker/flower.override.yml` the `flower_http.conf` with `flower_https.conf`.
 
 - **HTTPS with Let's Encrypt**
 
@@ -206,12 +190,6 @@ There are 3 options to execute the web server:
     Before using it, you should configure the configuration file `docker/traefik.override.yml` by changing the email address and the hostname where the application is served. For a detailed explanation follow the official documentation: [Traefix doc](https://docs.traefik.io/user-guides/docker-compose/acme-http/).
     
     After the configuration is done, you can add the option `--traefik` while executing the [`start.py`](#run)
-
-
-### Analyzers or connectors configuration (optional)
-
-Refer to [Analyzers customization](Usage.html#analyzers-customization) and [Connectors customization](Usage.html#connectors-customization).
-
 
 ## Run
 
@@ -225,7 +203,7 @@ You may invoke <code>$ python3 start.py --help</code> to get help and usage info
 The CLI provides the primitives to correctly build, run or stop the containers for IntelOwl. Therefore,
 <ul>
 <li>It is possible to attach every optional docker container that IntelOwl has:
-<a href="Advanced-Usage.html#multi-queue"><em>multi_queue</em></a> with <em>traefik</em> enabled while every <a href="Advanced-Usage.html#optional-analyzers">optional docker analyzer</a> is active.</li> 
+<a href="Advanced-Configuration.html#multi-queue"><em>multi_queue</em></a> with <em>traefik</em> enabled while every <a href="Advanced-Usage.html#optional-analyzers">optional docker analyzer</a> is active.</li> 
 <li>It is possible to insert an optional docker argument that the CLI will pass to <code>docker-compose</code></li>
 </ul>
 </div>
@@ -261,7 +239,7 @@ You may want to run `docker exec -ti intelowl_uwsgi python3 manage.py createsupe
 Then you can add other users directly from the Django Admin Interface after having logged with the superuser account.
 To manage users, organizations and their visibility please refer to this [section](/Usage.md#organizations-and-user-management)
 
-## Update and Re-build
+## Update and Rebuild
 
 ### Rebuilding the project / Creating custom docker build
 If you make some code changes and you like to rebuild the project, follow these steps:
@@ -281,26 +259,68 @@ $ python3 start.py prod up # restart the IntelOwl application
 ```
 
 <div class="admonition warning">
+<p class="admonition-title">Note</p>
+After an upgrade, sometimes a database error in Celery Containers could happen. That could be related to new DB migrations which are not applied by the main Uwsgi Container yet. Do not worry. Wait few seconds for the Uwsgi container to start correctly, then put down the application again and restart it. The problem should be solved. If not, please feel free to open an issue on Github
+</div>
+
+<div class="admonition warning">
+<p class="admonition-title">Note</p>
+After having upgraded IntelOwl, in case the application does not start and you get an error like this:
+
+```commandline
+PermissionError: [Errno 13] Permission denied: '/var/log/intel_owl/django/authentication.log
+```
+
+just run this:
+```commandline
+sudo chown -R www-data:www-data /var/lib/docker/volumes/intel_owl_generic_logs/_data/django
+```
+
+and restart IntelOwl. It should solve the permissions problem.
+</div>
+
+<div class="admonition warning">
 <p class="admonition-title">Warning</p>
 Major versions of IntelOwl are usually incompatible from one another.
 Maintainers strive to keep the upgrade between major version easy but it's not always like that.
 Below you can find the additional process required to upgrade from each major versions.
 </div>
 
-### Updating to >=4.0.0 from a 3.x.x version
-Right now there is an open [issue](https://github.com/intelowlproject/IntelOwl/issues/934) regarding the chance to provide a script for migrate the Users DB to the new IntelOwl v4 schema.
+#### Updating to >=5.0.0 from a 4.x.x version
+IntelOwl v5 introduced some major changes regarding how the plugins and their related configuration are managed in the application.
+Before upgrading, some important things should be checked by the administrator:
+* A lot of database migrations will need to be applied. Just be patient few minutes once you install the new major release. If you get 500 status code errors in the GUI, just wait few minutes and then refresh the page.
+* We moved away from the old big `analyzer_config.json` which was storing all the base configuration of the Analyzers to a database model (we did the same for all the other plugins types too). This allows us to manage plugins creation/modification/deletion in a more reliable manner and via the Django Admin Interface. If you have created custom plugins and changed those `<plugins>_config.json` file manually, you would need to re-create those custom plugins again from the Django Admin Interface. To do that please follow the [related new documentation](https://intelowl.readthedocs.io/en/develop/Usage.html#analyzers-customization)
+* We have REMOVED all the analyzers that we deprecated during the v4 releases cycle. Please substitute them with their respective new names, in case they have a replacement.
+  * REMOVED `Pulsedive_Active_IOC` analyzer. Please substitute it with the new `Pulsedive` analyzer.
+  * REMOVED `Fortiguard` analyzer because endpoint does not work anymore. No substitute.
+  * REMOVED `Rendertron` analyzer not working as intended. No substitute.
+  * REMOVED `ThreatMiner`, `SecurityTrails` and `Robtex` various analyzers and substituted with new versions.
+  * REMOVED `Doc_Info_Experimental`. Its functionality (XLM Macro parsing) is moved to `Doc_Info`
+  * REMOVED `Strings_Info_Classic`. Please use `Strings_Info`
+  * REMOVED `Strings_Info_ML`. Please use `Strings_Info` and set the parameter `rank_strings` to `True`
+  * REMOVED all `Yara_Scan_<repo>` analyzers. They all went merged in the single `Yara` analyzer
+  * REMOVED `Darksearch_Query` analyzer because the service does not exist anymore. No substitute.
+  * REMOVED `UnpacMe_EXE_Unpacker`. Please use `UnpacMe`
+  * REMOVED `BoxJS_Scan_JavaScript`. Please use `BoxJS`
+  * REMOVED all `Anomali_Threatstream_<option>` analyzers. Now we have a single `Anomali_Threatstream` analyzer. Use the parameters to select the specific API you need.
+
+#### Updating to >=5.0.0 from a 3.x.x version
+This is not supported. Please perform a major upgrade once at a time.
+
+#### Updating to >=4.0.0 from a 3.x.x version
 IntelOwl v4 introduced some major changes regarding the permission management, allowing an easier way to manage users and visibility. But that did break the previous available DB.
-So, while we find time and effort to develop this script, to migrate to the the new major version you would need to delete your DB. To do that, you would need to delete your volumes and start the application from scratch.
+So, to migrate to the new major version you would need to delete your DB. To do that, you would need to delete your volumes and start the application from scratch.
 ```commandline
 python3 start.py prod down -v
 ```
-Please be aware that, while this can be an important effort to manage, the v4 IntelOwl provides a easier way to add, invite and manage users from the application itself. See [the Organization section](./Usage.md#organizations-and-user-management).
+Please be aware that, while this can be an important effort to manage, the v4 IntelOwl provides an easier way to add, invite and manage users from the application itself. See [the Organization section](./Usage.md#organizations-and-user-management).
 
 
-### Updating to >=2.0.0 from a 1.x.x version
+#### Updating to >=2.0.0 from a 1.x.x version
 Users upgrading from previous versions need to manually move `env_file_app`, `env_file_postgres` and `env_file_integrations` files under the new `docker` directory.
 
-### Updating to >v1.3.x from any prior version
+#### Updating to >v1.3.x from any prior version
 
 If you are updating to >[v1.3.0](https://github.com/intelowlproject/IntelOwl/releases/tag/v1.3.0) from any prior version, you need to execute a helper script so that the old data present in the database doesn't break.
 

@@ -1,10 +1,18 @@
+/* eslint-disable no-param-reassign */
+/* eslint-disable react/prop-types */
+/* eslint-disable camelcase */
 import React from "react";
 import PropTypes from "prop-types";
 import { Button, ListGroup, ListGroupItem, Badge, Fade } from "reactstrap";
 import { useNavigate } from "react-router-dom";
 import { VscGlobe, VscFile, VscJson } from "react-icons/vsc";
 import { FaFileDownload } from "react-icons/fa";
-import { MdDeleteOutline, MdPauseCircleOutline } from "react-icons/md";
+import {
+  MdDeleteOutline,
+  MdPauseCircleOutline,
+  MdOutlineRefresh,
+  MdComment,
+} from "react-icons/md";
 
 import {
   ContentSection,
@@ -13,18 +21,42 @@ import {
   IconAlert,
   IconButton,
   addToast,
+  CopyToClipboardButton,
 } from "@certego/certego-ui";
 
 import { SaveAsPlaybookButton } from "./SaveAsPlaybooksForm";
 
 import { JobTag, PlaybookTag, StatusTag, TLPTag } from "../../../common";
 import { downloadJobSample, deleteJob, killJob } from "../api";
+import { createJob, createPlaybookJob } from "../../../scan/api";
 
 function DeleteIcon() {
-  return <MdDeleteOutline className="text-danger" />;
+  return (
+    <span>
+      <MdDeleteOutline className="text-danger" /> Delete Job
+    </span>
+  );
 }
 
-export function JobActionsBar({ job }) {
+function CommentIcon({ commentNumber }) {
+  return (
+    <span>
+      <MdComment className="me-1" />
+      Comments ({commentNumber})
+    </span>
+  );
+}
+
+function retryJobIcon() {
+  return (
+    <span>
+      <MdOutlineRefresh className="me-1" />
+      Rescan
+    </span>
+  );
+}
+
+export function JobActionsBar({ job, refetch }) {
   // routers
   const navigate = useNavigate();
 
@@ -35,6 +67,7 @@ export function JobActionsBar({ job }) {
     addToast("Redirecting...", null, "secondary");
     setTimeout(() => navigate(-1), 250);
   };
+
   const onDownloadSampleBtnClick = async () => {
     const blob = await downloadJobSample(job.id);
     if (!blob) return;
@@ -69,8 +102,45 @@ export function JobActionsBar({ job }) {
     job.is_sample ? job.file_name : job.observable_name
   }) on IntelOwl`;
 
+  const formValues = {
+    ...job,
+    check: "force_new",
+    classification: job.observable_classification,
+    tlp: job.tlp,
+    observable_names: [job.observable_name],
+    analyzers: job.analyzers_requested,
+    connectors: job.connectors_requested,
+    runtime_configuration: job.runtime_configuration,
+    tags_labels: job.tags.map((optTag) => optTag.label),
+    playbooks: [job.playbook_requested],
+  };
+
+  const handleRetry = async () => {
+    addToast("Retrying the same job...", null, "spinner", false, 2000);
+    if (job.playbook_to_execute) {
+      console.debug("retrying Playbook");
+      const jobId = await createPlaybookJob(formValues).then(refetch);
+      setTimeout(() => navigate(`/jobs/${jobId[0]}`), 1000);
+    } else {
+      console.debug("retrying Job");
+      const jobId = await createJob(formValues).then(refetch);
+      setTimeout(() => navigate(`/jobs/${jobId[0]}`), 1000);
+    }
+  };
+
+  const commentIcon = () => <CommentIcon commentNumber={job.comments.length} />;
   return (
-    <ContentSection className="d-inline-flex">
+    <ContentSection className="d-inline-flex me-2">
+      <IconButton
+        id="commentbtn"
+        Icon={commentIcon}
+        size="sm"
+        color="darker"
+        className="me-2"
+        onClick={() => navigate(`/jobs/${job.id}/comments`)}
+        title="Comments"
+        titlePlacement="top"
+      />
       {job.permissions?.delete && (
         <IconButton
           id="deletejobbtn"
@@ -83,12 +153,21 @@ export function JobActionsBar({ job }) {
           titlePlacement="top"
         />
       )}
+      <IconButton
+        Icon={retryJobIcon}
+        onClick={handleRetry}
+        color="light"
+        size="xs"
+        title="Force run the same analysis"
+        titlePlacement="top"
+        className="me-2"
+      />
 
       <SaveAsPlaybookButton jobId={job.id} />
       {job?.is_sample && (
         <Button
           size="sm"
-          color="darker"
+          color="secondary"
           className="me-2"
           onClick={onDownloadSampleBtnClick}
         >
@@ -111,8 +190,12 @@ export function JobActionsBar({ job }) {
 }
 
 export function JobInfoCard({ job }) {
+  const process_time_mmss = new Date(job.process_time * 1000)
+    .toISOString()
+    .substring(14, 19);
+
   return (
-    <>
+    <div id="JobInfoCardSection">
       <ContentSection className="mb-0 bg-darker d-flex-center">
         <div className="d-flex-start-start">
           <h3>
@@ -121,7 +204,24 @@ export function JobInfoCard({ job }) {
             ) : (
               <VscGlobe className="me-1" />
             )}
-            {job.is_sample ? job.file_name : job.observable_name}
+
+            {job.is_sample ? (
+              <CopyToClipboardButton
+                showOnHover
+                id="file_name"
+                text={job.file_name}
+              >
+                {job.file_name}
+              </CopyToClipboardButton>
+            ) : (
+              <CopyToClipboardButton
+                showOnHover
+                id="observable_name"
+                text={job.observable_name}
+              >
+                {job.observable_name}
+              </CopyToClipboardButton>
+            )}
           </h3>
           <Badge className="ms-1 float-end" color="info">
             {job.is_sample
@@ -140,7 +240,7 @@ export function JobInfoCard({ job }) {
             ["TLP", <TLPTag value={job.tlp} />],
             ["User", job.user?.username],
             ["MD5", job.md5],
-            ["Process Time (s)", job.process_time],
+            ["Process Time (mm:ss)", process_time_mmss],
             [
               "Start Time",
               <DateHoverable
@@ -189,14 +289,12 @@ export function JobInfoCard({ job }) {
               />,
             ],
             [
-              "Playbook(s)",
-              job.playbooks_to_execute.map((playbook) => (
-                <PlaybookTag
-                  key={playbook}
-                  playbook={playbook}
-                  className="mr-2"
-                />
-              )),
+              "Playbook",
+              <PlaybookTag
+                key={job.playbook_to_execute}
+                playbook={job.playbook_to_execute}
+                className="mr-2"
+              />,
             ],
           ].map(([key, value]) => (
             <ListGroupItem key={key}>
@@ -206,7 +304,7 @@ export function JobInfoCard({ job }) {
           ))}
         </ListGroup>
       </ContentSection>
-    </>
+    </div>
   );
 }
 

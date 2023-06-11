@@ -1,3 +1,6 @@
+# This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
+# See the file 'LICENSE' for copying permission.
+
 import os
 
 from django.core.files.storage import FileSystemStorage
@@ -5,8 +8,7 @@ from django.core.files.storage import FileSystemStorage
 from intel_owl import secrets
 
 from ._util import get_secret
-from .cache import MEDIA_ROOT
-from .commons import BASE_STATIC_PATH
+from .commons import BASE_STATIC_PATH, MEDIA_ROOT
 
 # Static Files (CSS, JavaScript, Images)
 STATIC_URL = "/static/"
@@ -15,7 +17,7 @@ STATICFILES_DIRS = [
     ("reactapp", "/var/www/reactapp"),
 ]
 
-
+NFS = get_secret("NFS", "False") == "True"
 LOCAL_STORAGE = get_secret("LOCAL_STORAGE", "True") == "True"
 # Storage settings
 if LOCAL_STORAGE:

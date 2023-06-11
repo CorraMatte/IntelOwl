@@ -3,6 +3,8 @@
 
 # flake8: noqa
 
+# this is better to be run after commons.py
+
 import os
 
 from intel_owl import secrets
@@ -31,11 +33,11 @@ AUTH_PASSWORD_VALIDATORS = [
 LDAP_ENABLED = os.environ.get("LDAP_ENABLED", False) == "True"
 RADIUS_AUTH_ENABLED = os.environ.get("RADIUS_AUTH_ENABLED", False) == "True"
 if LDAP_ENABLED:
-    from configuration.ldap_config import *  # lgtm [py/polluting-import]
+    from configuration.ldap_config import *  # lgtm [py/polluting-import] skipcq PYL-W0614
 
     AUTHENTICATION_BACKENDS.append("django_auth_ldap.backend.LDAPBackend")
 if RADIUS_AUTH_ENABLED:
-    from configuration.radius_config import *  # lgtm [py/polluting-import]
+    from configuration.radius_config import *  # lgtm [py/polluting-import] skipcq PYL-W0614
 
     AUTHENTICATION_BACKENDS.append("intel_owl.backends.CustomRADIUSBackend")
 

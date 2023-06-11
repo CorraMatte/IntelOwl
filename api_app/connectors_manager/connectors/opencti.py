@@ -25,14 +25,12 @@ INTELOWL_OPENCTI_TYPE_MAP = {
 
 
 class OpenCTI(classes.Connector):
-    def set_params(self, params):
-        self.ssl_verify = params.get("ssl_verify", True)
-        self.tlp = params.get(
-            "tlp", {"type": "white", "color": "#FFFFFF", "x_opencti_order": 0}
-        )
-        self.proxies = params.get("proxies", {})
-        self.__url_name = self._secrets["url_key_name"]
-        self.__api_key = self._secrets["api_key_name"]
+
+    ssl_verify: bool
+    tlp: dict
+    proxies: str
+    _url_key_name: str
+    _api_key_name: str
 
     def get_observable_type(self) -> str:
         if self._job.is_sample:
@@ -49,7 +47,7 @@ class OpenCTI(classes.Connector):
                 obs_type = INTELOWL_OPENCTI_TYPE_MAP[ObservableTypes.GENERIC]  # text
         elif self._job.observable_classification == ObservableTypes.IP:
             ip_version = helpers.get_ip_version(self._job.observable_name)
-            if ip_version == 4 or ip_version == 6:
+            if ip_version in [4, 6]:
                 obs_type = INTELOWL_OPENCTI_TYPE_MAP[ObservableTypes.IP][
                     f"v{ip_version}"
                 ]  # v4/v6
@@ -111,8 +109,8 @@ class OpenCTI(classes.Connector):
     def run(self):
         # set up client
         self.opencti_instance = pycti.OpenCTIApiClient(
-            url=self.__url_name,
-            token=self.__api_key,
+            url=self._url_key_name,
+            token=self._api_key_name,
             ssl_verify=self.ssl_verify,
             proxies=self.proxies,
         )
@@ -144,7 +142,8 @@ class OpenCTI(classes.Connector):
             description=(
                 f"This is IntelOwl's analysis report for Job: {self.job_id}."
                 # comma separate analyzers executed
-                f" Analyzers Executed: {', '.join(self._job.analyzers_to_execute)}"
+                " Analyzers Executed:"
+                f" {', '.join(list(self._job.analyzers_to_execute.all().values_list('name', flat=True)))}"  # noqa
             ),
             published=self._job.received_request_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
             report_types=["internal-report"],

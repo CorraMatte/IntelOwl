@@ -13,11 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class MWDBGet(ObservableAnalyzer):
-    def set_params(self, params):
-        self.__api_key = self._secrets["api_key_name"]
+    _api_key_name: str
 
     def run(self):
-        mwdb = mwdblib.MWDB(api_key=self.__api_key)
+        mwdb = mwdblib.MWDB(api_key=self._api_key_name)
 
         result = {}
         try:
@@ -30,7 +29,12 @@ class MWDBGet(ObservableAnalyzer):
             result["not_found"] = True
         else:
             result["data"] = file_info.data
-            result["attributes"] = file_info.attributes
+            # this could fail due to non-existing attributes
+            try:
+                result["attributes"] = file_info.attributes
+            except Exception as e:
+                logger.warning(e, stack_info=True)
+                self.report.errors.append(str(e))
             result["permalink"] = f"https://mwdb.cert.pl/file/{self.observable_name}"
 
         return result

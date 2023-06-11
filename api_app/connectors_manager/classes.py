@@ -1,21 +1,23 @@
 # This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
 # See the file 'LICENSE' for copying permission.
-
+import abc
 import logging
-from typing import Optional
+from typing import Optional, Type
 
 import requests
+from django.conf import settings
 
 from api_app.core.classes import Plugin
+from certego_saas.apps.user.models import User
 
-from ..exceptions import ConnectorConfigurationException, ConnectorRunException
-from .dataclasses import ConnectorConfig
-from .models import ConnectorReport
+from ..core.models import Parameter
+from .exceptions import ConnectorConfigurationException, ConnectorRunException
+from .models import ConnectorConfig, ConnectorReport
 
 logger = logging.getLogger(__name__)
 
 
-class Connector(Plugin):
+class Connector(Plugin, metaclass=abc.ABCMeta):
     """
     Abstract class for all Connectors.
     Inherit from this branch when defining a connector.
@@ -23,13 +25,24 @@ class Connector(Plugin):
      and `run(self)` functions.
     """
 
+    @classmethod
+    @property
+    def python_base_path(cls):
+        return settings.BASE_CONNECTOR_PYTHON_PATH
+
     @property
     def connector_name(self) -> str:
         return self._config.name
 
+    @classmethod
     @property
-    def report_model(self):
+    def report_model(cls) -> Type[ConnectorReport]:
         return ConnectorReport
+
+    @classmethod
+    @property
+    def config_model(cls) -> Type[ConnectorConfig]:
+        return ConnectorConfig
 
     def get_exceptions_to_catch(self) -> list:
         return [
@@ -44,35 +57,69 @@ class Connector(Plugin):
         )
 
     def before_run(self, *args, **kwargs):
-        parent_playbook = kwargs.get("parent_playbooks", "")
-        self.add_parent_playbook(parent_playbook=parent_playbook)
+        super().before_run()
         logger.info(f"STARTED connector: {self.__repr__()}")
+        self._config: ConnectorConfig
+        if self._job.status not in [
+            self._job.Status.REPORTED_WITH_FAILS,
+            self._job.Status.REPORTED_WITHOUT_FAILS,
+        ]:
+            if (
+                self._config.run_on_failure
+                and self._job.status == self._job.Status.FAILED
+            ):
+                logger.info(
+                    f"Running connector {self.__class__.__name__} "
+                    f"even if job status is {self._job.status} because"
+                    "run on failure is set"
+                )
+            else:
+                raise ConnectorRunException(
+                    f"Job status is {self._job.status}, "
+                    f"unable to run connector {self.__class__.__name__}"
+                )
 
     def after_run(self):
+        super().after_run()
         logger.info(f"FINISHED connector: {self.__repr__()}")
 
-    def __repr__(self):
-        return f"({self.connector_name}, job: #{self.job_id})"
-
     @classmethod
-    def health_check(cls, connector_name: str) -> Optional[bool]:
+    def health_check(cls, connector_name: str, user: User) -> Optional[bool]:
         """
         basic health check: if instance is up or not (timeout - 10s)
         """
-        health_status, url = None, None
-        # todo this is already done by the caller, to optimize this
-        cc = ConnectorConfig.get(connector_name)
-        if cc is not None:
-            url = cc.read_secrets(secrets_filter="url_key_name").get(
-                "url_key_name", None
-            )
-            if url and url.startswith("http"):
-                try:
-                    requests.head(url, timeout=10)
-                    health_status = True
-                except requests.exceptions.ConnectionError:
-                    health_status = False
-                except requests.exceptions.Timeout:
-                    health_status = False
+        ccs = cls.config_model.objects.filter(name=connector_name, disabled=False)
+        if not ccs.count():
+            raise ConnectorRunException(f"Unable to find connector {connector_name}")
+        for cc in ccs:
+            cc: ConnectorConfig
+            if cc.is_runnable(user):
+                logger.info(
+                    f"Found connector runnable {cc.name} for user {user.username}"
+                )
+                param: Parameter = cc.parameters.filter(name__startswith="url").first()
+                logger.info(f"Url retrieved to verify is {param.name}")
+                if param:
+                    try:
+                        plugin_config = param.get_first_value(user)
+                    except RuntimeError:
+                        continue
+                    else:
+                        url = plugin_config.value
+                        if url.startswith("http"):
+                            logger.info(f"Checking url {url} for connector {cc.name}")
+                            if settings.STAGE_CI:
+                                return True
+                            try:
+                                requests.head(url, timeout=10)
+                            except requests.exceptions.ConnectionError:
+                                health_status = False
+                            except requests.exceptions.Timeout:
+                                health_status = False
+                            else:
+                                health_status = True
 
-        return health_status
+                            return health_status
+        raise ConnectorRunException(
+            f"Unable to find configured connector {connector_name}"
+        )

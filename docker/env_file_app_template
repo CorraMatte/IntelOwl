@@ -4,18 +4,32 @@ DB_HOST=postgres
 DB_PORT=5432
 DB_USER=user
 DB_PASSWORD=password
+DB_SSL=False
+DB_NAME=intel_owl_db
 
 # Additional Config variables
-# jobs older than this would be flushed from the database periodically. Default: 3 days
-OLD_JOBS_RETENTION_DAYS=3
+# jobs older than this would be flushed from the database periodically. Default: 14 days
+OLD_JOBS_RETENTION_DAYS=14
 # used for generating links to web client e.g. job results page; Default: localhost
 INTELOWL_WEB_CLIENT_DOMAIN=localhost
+# used for automated correspondence from the site manager
+DEFAULT_FROM_EMAIL=
+# used for correspondence with users
+DEFAULT_EMAIL=
 # Storage
 LOCAL_STORAGE=True
 
 # OAuth2
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+
+# SMTP backend
+EMAIL_HOST= 
+EMAIL_HOST_USER= 
+EMAIL_HOST_PASSWORD= 
+EMAIL_PORT=
+EMAIL_USE_TLS=False
+EMAIL_USE_SSL=False
 
 # AWS
 ## S3 storage
@@ -27,7 +41,16 @@ AWS_SECRET_ACCESS_KEY=
 ## secrets, broker and region
 AWS_SECRETS=False
 AWS_SQS=False
+AWS_USER_NUMBER=
 AWS_REGION=eu-central-1
+# IAM ROLE for RDS
+AWS_RDS_IAM_ROLE=False
+## to use for sending mail with SES
+AWS_SES=False
+
+# Uploads
+SLACK_TOKEN=
+DEFAULT_SLACK_CHANNEL=
 
 # Elastic Search Configuration
 ELASTICSEARCH_ENABLED=False
@@ -43,28 +66,16 @@ TEST_DOMAIN=www.google.com
 TEST_URL=https://www.google.com/search?test
 TEST_MD5=446c5fbb11b9ce058450555c1c27153c
 
-# URLs
-CAPESANDBOX_URL=
-CUCKOO_URL=
-MISP_URL=
-FIRST_MISP_URL=
-VT_NOTIFY_URL=
-OPENCTI_URL=
-OPENCTI_URL=
-YETI_URL=
-CONNECTOR_MISP_URL=
-CONNECTOR_OPENCTI_URL=
-CONNECTOR_YETI_URL=
-
 # other variables
 STAGE="production"
 DEBUG=False
 LDAP_ENABLED=False
 DISABLE_LOGGING_TEST=False
 MOCK_CONNECTIONS=False
-DB_NAME=intel_owl_db
 HTTPS_ENABLED=not_enabled
 RADIUS_AUTH_ENABLED=False
+# True for public deployment, False for internal deployment
+PUBLIC_DEPLOYMENT=False
 # broker configuration
 BROKER_URL=amqp://guest:guest@rabbitmq:5672
 BROKER_URL_API=http://guest:guest@rabbitmq:15672/api/
@@ -73,5 +84,9 @@ RABBITMQ_DEFAULT_PASS=guest
 FLOWER_USER=flower
 FLOWER_PWD=flower
 
-# playbooks
-TEST_PLAYBOOK=FREE_TO_USE_ANALYZERS
+
+# drf-recaptcha
+## localhost, internal deployments
+RECAPTCHA_SECRET_KEY_IO_LOCAL=""
+## public deployment
+RECAPTCHA_SECRET_KEY_IO_PUBLIC=""

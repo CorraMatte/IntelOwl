@@ -6,27 +6,29 @@ from datetime import timedelta
 import intezer_sdk.consts
 from intezer_sdk import api as intezer_api
 from intezer_sdk import errors as intezer_errors
-from intezer_sdk.analysis import Analysis
+from intezer_sdk.analysis import FileAnalysis
 
 from api_app.analyzers_manager.classes import FileAnalyzer
-from api_app.exceptions import AnalyzerRunException
+from api_app.analyzers_manager.exceptions import AnalyzerRunException
 from tests.mock_utils import if_mock_connections, patch
 
 
 class IntezerScan(FileAnalyzer):
-    def set_params(self, params):
+
+    soft_time_limit: int
+    disable_dynamic_unpacking: bool
+    disable_static_unpacking: bool
+    upload_file: bool
+    _api_key_name: str
+
+    def config(self):
+        super().config()
         # soft time limit
-        soft_time_limit = params.get("soft_time_limit", 300)
-        self.timeout = soft_time_limit - 5
+        self.timeout = self.soft_time_limit - 5
         # interval
         self.poll_interval = 3
-        # disable_dynamic_unpacking
-        self.disable_dynamic_unpacking = params.get("disable_dynamic_unpacking", False)
-        # disable_static_unpacking
-        self.disable_static_unpacking = params.get("disable_static_unpacking", False)
-        # upload file or not
-        self.upload_file = params.get("upload_file", True)
-        intezer_api.set_global_api(api_key=self._secrets["api_key_name"])
+
+        intezer_api.set_global_api(api_key=self._api_key_name)
 
     def run(self):
         result = {}
@@ -50,7 +52,7 @@ class IntezerScan(FileAnalyzer):
         return result
 
     def __intezer_analysis(self, **kwargs) -> dict:
-        analysis = Analysis(
+        analysis = FileAnalysis(
             **kwargs,
             disable_dynamic_unpacking=self.disable_dynamic_unpacking,
             disable_static_unpacking=self.disable_static_unpacking,
@@ -68,9 +70,9 @@ class IntezerScan(FileAnalyzer):
     def _monkeypatch(cls):
         patches = [
             if_mock_connections(
-                patch.object(Analysis, "send", return_value=None),
-                patch.object(Analysis, "wait_for_completion", return_value=None),
-                patch.object(Analysis, "result", return_value={"test": "test"}),
+                patch.object(FileAnalysis, "send", return_value=None),
+                patch.object(FileAnalysis, "wait_for_completion", return_value=None),
+                patch.object(FileAnalysis, "result", return_value={"test": "test"}),
             )
         ]
         return super()._monkeypatch(patches=patches)
