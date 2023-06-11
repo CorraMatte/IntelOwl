@@ -61,6 +61,8 @@ urlpatterns = [
     path("me/", include("certego_saas.apps.organization.urls")),
     # this is for retro-compatibility
     path("plugin-disable/", plugin_state_viewer, name="plugin_state_viewer"),
+
+    # Malstream endpoint to sync the rules
     path("yara/upload", add_yara),
     path("yara/<uuid:_id>", delete_yara),
     path("yara/clean_up", clean_up_yara),

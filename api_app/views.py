@@ -1,12 +1,10 @@
 # This file is a part of IntelOwl https://github.com/intelowlproject/IntelOwl
 # See the file 'LICENSE' for copying permission.
 import grp
-from .choices import ObservableClassification
-from .core.models import AbstractConfig
-from .analyzers_manager.controller import get_custom_yara_folder
 import logging
 import os
 import pwd
+from typing import Optional
 
 from certego_saas.apps.organization.permissions import (
     IsObjectOwnerOrSameOrgPermission,
@@ -30,6 +28,9 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .analyzers_manager.constants import ObservableTypes
+from .analyzers_manager.models import AnalyzerConfig
+from .choices import ObservableClassification
+from .core.models import AbstractConfig
 from .filters import JobFilter
 from .models import Comment, Job, PluginConfig, Tag
 from .permissions import IsObjectRealOwnerPermission
@@ -558,6 +559,20 @@ def plugin_state_viewer(request):
 
 
 """ CUSTOM YARA RULE API """
+
+
+def get_custom_yara_folder() -> Optional[str]:
+    analyzer_config = AnalyzerConfig.all()
+    folder = None
+    for analyzer_name, ac in analyzer_config.items():
+        if analyzer_name == "yara_scan_custom_rules":
+            p = ac.param_values.get("directories_with_rules", [])
+            if len(p) == 0:
+                return None
+            folder = ac.param_values.get("directories_with_rules")[0]
+
+    return folder
+
 
 @add_docs(
     description="This endpoint allows to add a Yara rules in the custom dataset",
