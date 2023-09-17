@@ -3,10 +3,10 @@
 import datetime
 import grp
 import logging
-import uuid
-from abc import ABCMeta, abstractmethod
 import os
 import pwd
+import uuid
+from abc import ABCMeta, abstractmethod
 from typing import Optional
 
 from certego_saas.apps.organization.permissions import (
@@ -31,16 +31,8 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from certego_saas.apps.organization.permissions import (
-    IsObjectOwnerOrSameOrgPermission,
-    IsObjectOwnerPermission,
-)
-from certego_saas.ext.helpers import cache_action_response, parse_humanized_range
-from certego_saas.ext.mixins import SerializerActionMixin
-from certego_saas.ext.viewsets import ReadAndDeleteOnlyViewSet
 from intel_owl import tasks
 from intel_owl.celery import app as celery_app
-
 from .analyzers_manager.constants import ObservableTypes
 from .analyzers_manager.models import AnalyzerConfig
 from .choices import ObservableClassification
